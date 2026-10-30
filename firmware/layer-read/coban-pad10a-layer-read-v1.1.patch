@@ -1,0 +1,192 @@
+diff --git a/keyboards/coban/pad10a/hid/hid.c b/keyboards/coban/pad10a/hid/hid.c
+index 288f3c0..60e10d8 100644
+--- a/keyboards/coban/pad10a/hid/hid.c
++++ b/keyboards/coban/pad10a/hid/hid.c
+@@ -16,6 +16,10 @@
+ 
+ #include "hid/hid.h"
+ #include "raw_hid.h"
++#include "action_layer.h"
++#include "dynamic_keymap.h"
++#include "timer.h"
++#include "hid/layer_read.h"
+ 
+ #include "graphics/ui.h"
+ #include "eeprom/cb_eeprom.h"
+@@ -136,9 +140,9 @@ void cb_raw_hid_receive_kb(uint8_t *data, uint8_t length) {
+ 
+             lv_img_cache_invalidate_src(&gif_data_header);
+ 
+-            if (current_screen() == coban_screen_anime) {
+-                screen_animation_reload();
+-            }
++            // The active background is already the GIF view in animation mode.
++            // A second decoder costs another ~51 KiB and can exhaust RP2040 RAM.
++            screen_animation_delete();
+             screen_background_reload();
+             break;
+         }
+@@ -203,6 +207,16 @@ void cb_raw_hid_response_kb(uint8_t *data, uint8_t length) {
+     uint8_t *command_data = &(data[1]);
+ 
+     switch (*command_id) {
++#ifdef VIA_ENABLE
++        case COBAN_LAYER_READ_VALUE_ID: {
++            // Read the QMK action engine, not the LCD cache or editing layer.
++            if (length == 30) {
++                coban_layer_read_reply(command_data, length - 1, (uint32_t)layer_state,
++                                       (uint32_t)default_layer_state, dynamic_keymap_get_layer_count(), timer_read32());
++            }
++            break;
++        }
++#endif
+         case coban_cmd_id_set_screen: {
+             *(command_data + 0) = 0xff & config.screen_idx;
+             *(command_data + 1) = 0xff & config.screen_switch_layer;
+diff --git a/keyboards/coban/pad10a/hid/layer_read.c b/keyboards/coban/pad10a/hid/layer_read.c
+new file mode 100644
+index 0000000..0a831dc
+--- /dev/null
++++ b/keyboards/coban/pad10a/hid/layer_read.c
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#include "layer_read.h"
++#include <string.h>
++
++static void write_be32(uint8_t *out, uint32_t value) {
++    out[0] = (uint8_t)(value >> 24);
++    out[1] = (uint8_t)(value >> 16);
++    out[2] = (uint8_t)(value >> 8);
++    out[3] = (uint8_t)value;
++}
++
++bool coban_layer_read_reply(uint8_t *payload, uint8_t length, uint32_t layers, uint32_t defaults, uint8_t count, uint32_t uptime) {
++    if (payload == NULL || length != COBAN_LAYER_READ_PAYLOAD_SIZE) {
++        return false;
++    }
++    memset(payload, 0, COBAN_LAYER_READ_PAYLOAD_SIZE);
++    memcpy(payload, "CBLR", 4);
++    payload[4] = 1; // Wire version, independent of VIA/firmware version.
++    payload[5] = 3; // Bit 0: live masks; bit 1: single-decoder GIF reload fix.
++    uint32_t effective = layers | defaults;
++    uint8_t highest = 0; // QMK resolves an empty mask to layer 0.
++    for (uint8_t bit = 0; bit < 32; ++bit) {
++        if (effective & (UINT32_C(1) << bit)) {
++            highest = bit;
++        }
++    }
++    if (count == 0 || count > 32 || highest >= count) {
++        payload[5] |= 0x80; // Invalid runtime state, host must not select an image.
++        highest = 0xff;
++    }
++    payload[6] = highest;
++    payload[7] = count;
++    write_be32(payload + 8, layers);
++    write_be32(payload + 12, defaults);
++    write_be32(payload + 16, uptime);
++    // Bytes 20..28 reserved, zero. No change counter is advertised in v1.
++    return true;
++}
+diff --git a/keyboards/coban/pad10a/hid/layer_read.h b/keyboards/coban/pad10a/hid/layer_read.h
+new file mode 100644
+index 0000000..abf32ab
+--- /dev/null
++++ b/keyboards/coban/pad10a/hid/layer_read.h
+@@ -0,0 +1,11 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#pragma once
++
++#include <stdbool.h>
++#include <stdint.h>
++
++#define COBAN_LAYER_READ_VALUE_ID 0x65
++#define COBAN_LAYER_READ_PAYLOAD_SIZE 29
++
++// Stateless encoder: only writes the supplied USB response, never device state.
++bool coban_layer_read_reply(uint8_t *payload, uint8_t length, uint32_t layers, uint32_t defaults, uint8_t count, uint32_t uptime);
+diff --git a/keyboards/coban/pad10a/keymaps/coban_mod/config.h b/keyboards/coban/pad10a/keymaps/coban_mod/config.h
+new file mode 100644
+index 0000000..f41c0e5
+--- /dev/null
++++ b/keyboards/coban/pad10a/keymaps/coban_mod/config.h
+@@ -0,0 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#pragma once
++
++// The pinned upstream reserves only 4 KiB after the GIF, but its RP2040
++// EEPROM backing store occupies the final 8 KiB. Keep EEPROM where it is,
++// and move only the 100 KiB GIF region down by one 4 KiB erase sector.
++#define WEAR_LEVELING_BACKING_SIZE 8192
++#undef EEROM_CB_GIF_ADDR
++#define EEROM_CB_GIF_ADDR (PICO_FLASH_SIZE_BYTES - EEPROM_MAX_GIF_SIZE - WEAR_LEVELING_BACKING_SIZE)
+diff --git a/keyboards/coban/pad10a/keymaps/coban_mod/keymap.c b/keyboards/coban/pad10a/keymaps/coban_mod/keymap.c
+new file mode 100644
+index 0000000..4169b7d
+--- /dev/null
++++ b/keyboards/coban/pad10a/keymaps/coban_mod/keymap.c
+@@ -0,0 +1,28 @@
++/* Copyright 2023 RyanDam (https://github.com/RyanDam)
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include QMK_KEYBOARD_H
++
++const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
++    [0] = LAYOUT(KC_MPLY, TO(1), KC_PGUP, KC_ESC, KC_UP, KC_ENT, KC_PGDN, KC_LEFT, KC_DOWN, KC_RIGHT),
++    [1] = LAYOUT(KC_MPLY, TO(2), KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS),
++    [2] = LAYOUT(KC_MPLY, TO(3), KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS),
++    [3] = LAYOUT(KC_MPLY, TO(0), QK_KB_0, QK_BACKLIGHT_DOWN, QK_BACKLIGHT_UP, QK_BOOTLOADER, QK_KB_1, QK_KB_7, QK_KB_5, QK_KB_6),
++};
++
++#if defined(ENCODER_MAP_ENABLE)
++const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {[0] = {ENCODER_CCW_CW(KC_VOLD, KC_VOLU), ENCODER_CCW_CW(MS_WHLU, MS_WHLD)}, [1] = {ENCODER_CCW_CW(KC_VOLD, KC_VOLU), ENCODER_CCW_CW(MS_WHLU, MS_WHLD)}, [2] = {ENCODER_CCW_CW(KC_VOLD, KC_VOLU), ENCODER_CCW_CW(MS_WHLU, MS_WHLD)}, [3] = {ENCODER_CCW_CW(KC_VOLD, KC_VOLU), ENCODER_CCW_CW(MS_WHLU, MS_WHLD)}};
++#endif
+diff --git a/keyboards/coban/pad10a/keymaps/coban_mod/rules.mk b/keyboards/coban/pad10a/keymaps/coban_mod/rules.mk
+new file mode 100644
+index 0000000..cfa5d9a
+--- /dev/null
++++ b/keyboards/coban/pad10a/keymaps/coban_mod/rules.mk
+@@ -0,0 +1,3 @@
++VIA_ENABLE = yes
++ENCODER_MAP_ENABLE = yes
++SRC += storage_guard.c
+diff --git a/keyboards/coban/pad10a/keymaps/coban_mod/storage_guard.c b/keyboards/coban/pad10a/keymaps/coban_mod/storage_guard.c
+new file mode 100644
+index 0000000..394b522
+--- /dev/null
++++ b/keyboards/coban/pad10a/keymaps/coban_mod/storage_guard.c
+@@ -0,0 +1,11 @@
++// SPDX-License-Identifier: GPL-2.0-or-later
++#include "pico.h"
++#include "hardware/flash.h"
++#include "wear_leveling_rp2040_flash_config.h"
++
++_Static_assert(WEAR_LEVELING_BACKING_SIZE == 8192, "Unexpected EEPROM backing size");
++_Static_assert(EEPROM_MAX_GIF_SIZE == 102400, "Unexpected GIF capacity");
++_Static_assert(EEROM_CB_GIF_ADDR % FLASH_SECTOR_SIZE == 0, "GIF start must align to erase sectors");
++_Static_assert(EEPROM_MAX_GIF_SIZE % FLASH_SECTOR_SIZE == 0, "GIF size must align to erase sectors");
++_Static_assert(EEROM_CB_GIF_ADDR + EEPROM_MAX_GIF_SIZE <= WEAR_LEVELING_RP2040_FLASH_BASE, "GIF must not overlap EEPROM");
++_Static_assert(WEAR_LEVELING_RP2040_FLASH_BASE + WEAR_LEVELING_BACKING_SIZE <= PICO_FLASH_SIZE_BYTES, "EEPROM exceeds flash");
+diff --git a/keyboards/coban/pad10a/rules.mk b/keyboards/coban/pad10a/rules.mk
+index a8e99dc..62b4bfc 100644
+--- a/keyboards/coban/pad10a/rules.mk
++++ b/keyboards/coban/pad10a/rules.mk
+@@ -33,3 +33,6 @@ SRC += graphics/fonts/dm_serif.c
+ SRC += graphics/fonts/icons.c
+ 
+ OPT_DEFS = -O2
++
++# Coban-mod live layer readback (GET only).
++SRC += hid/layer_read.c

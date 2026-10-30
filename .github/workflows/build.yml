@@ -1,0 +1,32 @@
+name: Coban-mod builds
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  test-and-build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --check
+      - run: cargo test --locked
+        env:
+          MK_DATA_DIR: ${{ runner.temp }}/mk-tests
+      - run: cargo clippy --locked --all-targets -- -D warnings
+      - run: cargo build --locked --release --bin mk
+      - if: runner.os == 'macOS'
+        run: cargo build --locked --release --no-default-features --bin mk-agent
+      - if: runner.os == 'macOS'
+        run: python3 scripts/package.py --mac
+      - if: runner.os == 'Windows'
+        run: python scripts/package.py --windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Coban-mod-${{ runner.os }}
+          path: dist/

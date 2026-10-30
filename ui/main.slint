@@ -1,0 +1,1184 @@
+import { LineEdit, TextEdit, ComboBox, SpinBox, ScrollView, CheckBox, Slider, Palette } from "std-widgets.slint";
+
+export struct FunctionView { title: string, detail: string, icon: int, code: int }
+export struct SettingField { label: string, value: int, maximum: int, options: [string], option-values: [int], option-index: int, kind: int }
+export struct StepView { title: string, detail: string, icon: int }
+export struct IconChoice { name: string, label: string, art: image }
+
+// EZP design tokens (EZP-SwiftUI DesignSystem + EZP Windows component spec).
+global C {
+    in-out property <bool> dark;
+    out property <color> win: dark ? #1E1E1E : #FFFFFF;
+    out property <color> ground: dark ? #18181A : #F5F5F7;
+    out property <color> sidebar: dark ? #24252A : #EDEDEE;
+    out property <color> sidebar-sel: dark ? #47494F : #D7D8DA;
+    out property <color> group: dark ? #252527 : #F7F7F7;
+    out property <color> group-line: dark ? #FFFFFF14 : #0000000F;
+    out property <color> text: dark ? #FFFFFFD8 : #000000D8;
+    out property <color> text2: dark ? #FFFFFF8C : #0000007F;
+    out property <color> text3: dark ? #FFFFFF3F : #00000042;
+    out property <color> fill: dark ? #FFFFFF14 : #00000014;
+    out property <color> fill-strong: dark ? #FFFFFF19 : #00000019;
+    out property <color> hover: dark ? #FFFFFF0D : #00000009;
+    out property <color> press: dark ? #FFFFFF1C : #00000016;
+    out property <color> sep: dark ? #FFFFFF19 : #00000019;
+    out property <color> accent: #007AFF;
+    out property <color> accent-soft: dark ? #0A84FF33 : #007AFF1F;
+    out property <color> link: dark ? #419CFF : #0068DA;
+    out property <color> knob: dark ? #E1E1E1 : #FFFFFF;
+    out property <color> red: dark ? #FF4245 : #FF383C;
+    out property <color> green: dark ? #30D158 : #34C759;
+    out property <color> orange: dark ? #FF9230 : #FF8D28;
+    out property <color> warning-text: dark ? #FFB35C : #B26A00;
+    // Screen colours (EZPDesignPalette.Screen).
+    out property <color> purple: #BF5AF2;
+    out property <color> pink: #FF375F;
+    out property <color> teal: #32ADE6;
+    out property <color> yellow: #FF9F0A;
+    out property <color> gray: #8E8E93;
+    // Coban Pad 10A mock-up.
+    out property <color> device: dark ? #2B2C31 : #DFE1E6;
+    out property <color> device-line: dark ? #FFFFFF14 : #0000000F;
+    out property <color> keycap: dark ? #3A3B41 : #FFFFFF;
+    out property <color> keycap-edge: dark ? #4C4D54 : #C9CCD3;
+    out property <color> lcd: #0B0F17;
+}
+global L {
+    in-out property <bool> en;
+    public pure function t(vi: string, english: string) -> string { return self.en ? english : vi; }
+}
+global A {
+    out property <[image]> icons: [@image-url("../assets/ui/0.svg"),@image-url("../assets/ui/1.svg"),@image-url("../assets/ui/2.svg"),@image-url("../assets/ui/3.svg"),@image-url("../assets/ui/4.svg"),@image-url("../assets/ui/5.svg"),@image-url("../assets/ui/6.svg"),@image-url("../assets/ui/7.svg"),@image-url("../assets/ui/8.svg"),@image-url("../assets/ui/9.svg"),@image-url("../assets/ui/10.svg"),@image-url("../assets/ui/11.svg"),@image-url("../assets/ui/12.svg"),@image-url("../assets/ui/13.svg"),@image-url("../assets/ui/14.svg"),@image-url("../assets/ui/15.svg"),@image-url("../assets/ui/16.svg"),@image-url("../assets/ui/17.svg"),@image-url("../assets/ui/18.svg"),@image-url("../assets/ui/19.svg"),@image-url("../assets/ui/20.svg"),@image-url("../assets/ui/21.svg"),@image-url("../assets/ui/22.svg"),@image-url("../assets/ui/23.svg"),@image-url("../assets/ui/24.svg"),@image-url("../assets/ui/25.svg"),@image-url("../assets/ui/26.svg"),@image-url("../assets/ui/27.svg"),@image-url("../assets/ui/28.svg"),@image-url("../assets/ui/29.svg"),@image-url("../assets/ui/30.svg"),@image-url("../assets/ui/31.svg"),@image-url("../assets/ui/32.svg"),@image-url("../assets/ui/33.svg"),@image-url("../assets/ui/34.svg"),@image-url("../assets/ui/35.svg"),@image-url("../assets/ui/36.svg"),@image-url("../assets/ui/37.svg"),@image-url("../assets/ui/38.svg"),@image-url("../assets/ui/39.svg"),@image-url("../assets/ui/40.svg"),@image-url("../assets/ui/41.svg"),@image-url("../assets/ui/42.svg"),@image-url("../assets/ui/43.svg"),@image-url("../assets/ui/44.svg"),@image-url("../assets/ui/45.svg"),@image-url("../assets/ui/46.svg"),@image-url("../assets/ui/47.svg"),@image-url("../assets/ui/48.svg"),@image-url("../assets/ui/49.svg"),@image-url("../assets/ui/50.svg"),@image-url("../assets/ui/51.svg")];
+}
+
+// ---------- EZP components ----------
+component Icon inherits Image { in property <int> kind; source: A.icons[root.kind]; colorize: C.text; width: 16px; height: 16px; image-fit: contain; }
+component IconSlot inherits Rectangle {
+    in property <int> kind; in property <color> ink: C.text; in property <length> size: 16px;
+    width: root.size; horizontal-stretch: 0;
+    Icon {kind:root.kind;colorize:root.ink;width:root.size;height:root.size;y:(parent.height - self.height)/2;}
+}
+component IconBadge inherits Rectangle {
+    in property <int> kind; in property <color> tint: C.gray; in property <length> size: 28px;
+    width: root.size; height: root.size; border-radius: root.size * 0.25; background: root.tint;
+    Icon {kind:root.kind;colorize:#FFFFFF;width:root.size * 0.6;height:root.size * 0.6;x:(parent.width - self.width)/2;y:(parent.height - self.height)/2;}
+}
+component Caption inherits Text { color: C.text2; font-size: 11px; wrap: word-wrap; }
+component SectionTitle inherits Text { color: C.text; font-size: 15px; font-weight: 700; }
+// EzpButton: 0 bordered · 1 prominent · 2 borderless · 3 destructive · 4 destructive prominent.
+component EzButton inherits Rectangle {
+    in property <string> text; in property <int> icon: -1; in property <int> kind: 0;
+    in property <bool> enabled: true; in property <bool> small;
+    callback clicked();
+    property <bool> solid: root.kind == 1 || root.kind == 4;
+    property <color> ink: !root.enabled ? (root.solid ? #FFFFFFB3 : C.text3) : root.solid ? #FFFFFF : root.kind == 3 ? C.red : root.kind == 2 ? C.text2 : C.text;
+    height: root.small ? 20px : 24px; min-width: lay.preferred-width; horizontal-stretch: 0;
+    border-radius: root.small ? 5px : 6px;
+    background: root.kind == 1 ? C.accent : root.kind == 4 ? C.red : root.kind == 2 ? transparent : C.fill;
+    opacity: root.solid && !root.enabled ? 0.7 : 1;
+    Rectangle {
+        border-radius: parent.border-radius;
+        background: !root.enabled ? transparent : ta.pressed ? (root.solid ? #00000029 : C.press) : ta.has-hover ? (root.solid ? #00000012 : C.hover) : transparent;
+    }
+    lay := HorizontalLayout {
+        padding-left: root.text == "" ? 6px : (root.small ? 10px : 12px); padding-right: self.padding-left; spacing: 5px; alignment: center;
+        if root.icon >= 0: IconSlot {kind:root.icon;ink:root.ink;size:root.small ? 12px : 14px;}
+        if root.text != "": Text {text:root.text;color:root.ink;font-size:root.small ? 11px : 13px;vertical-alignment:center;}
+    }
+    accessible-role: button; accessible-label: root.text; accessible-enabled: root.enabled;
+    accessible-action-default => { if(root.enabled){root.clicked();} }
+    ta := TouchArea {enabled:root.enabled;clicked=>{root.clicked();}}
+}
+component EzSwitch inherits Rectangle {
+    in property <bool> checked; in property <bool> enabled: true; in property <string> label;
+    callback toggled(bool);
+    width: 44px; height: 20px; border-radius: self.height / 2;
+    background: root.checked ? C.accent : C.fill-strong; opacity: root.enabled ? 1 : 0.5;
+    Rectangle {
+        y: 2px; x: root.checked ? root.width - self.width - 2px : 2px; width: 26px; height: 16px; border-radius: 8px;
+        background: C.knob; drop-shadow-blur: 2.5px; drop-shadow-offset-y: 1px; drop-shadow-color: #00000040;
+        animate x { duration: 160ms; easing: ease-out; }
+    }
+    accessible-role: checkbox; accessible-checkable: true; accessible-checked: root.checked; accessible-label: root.label; accessible-enabled: root.enabled;
+    accessible-action-default => { if(root.enabled){root.toggled(!root.checked);} }
+    TouchArea {enabled:root.enabled;clicked=>{root.toggled(!root.checked);}}
+}
+// EzpSegmented; `toolbar` is the pill variant used in window toolbars.
+component EzSegmented inherits Rectangle {
+    in property <[string]> items; in property <int> current; in property <bool> enabled: true; in property <bool> toolbar; in property <bool> stretch;
+    in property <bool> prominent: false;
+    callback selected(int);
+    height: root.toolbar ? 30px : 24px; border-radius: root.toolbar ? 15px : 6px; background: C.fill;
+    horizontal-stretch: root.stretch ? 1 : 0; min-width: lay.preferred-width;
+    lay := HorizontalLayout {
+        padding: root.toolbar ? 2px : 0px; spacing: 0px;
+        for item[i] in root.items: seg := Rectangle {
+            property <bool> on: i == root.current;
+            min-width: label.preferred-width + (root.toolbar ? 28px : 24px); horizontal-stretch: 1;
+            border-radius: root.toolbar ? 13px : 6px;
+            background: self.on ? (root.toolbar && !root.prominent ? C.win : C.accent) : (cell.has-hover && root.enabled ? C.hover : transparent);
+            drop-shadow-blur: self.on && root.toolbar ? 2px : 0px; drop-shadow-color: #0000001F; drop-shadow-offset-y: 1px;
+            opacity: root.enabled || self.on ? 1 : 0.6;
+            if i > 0 && !seg.on && i - 1 != root.current: Rectangle {x:0px;width:1px;height:12px;y:(parent.height - 12px)/2;background:C.sep;}
+            label := Text {text:item;color:seg.on && (!root.toolbar || root.prominent) ? #FFFFFF : (root.enabled ? C.text : C.text3);font-size:13px;font-weight:seg.on && root.toolbar ? 600 : 400;horizontal-alignment:center;vertical-alignment:center;}
+            accessible-role: tab; accessible-label: item; accessible-enabled: root.enabled; accessible-item-selected: self.on;
+            accessible-action-default => { if(root.enabled){root.selected(i);} }
+            cell := TouchArea {enabled:root.enabled;clicked=>{root.selected(i);}}
+        }
+    }
+}
+component Card inherits Rectangle { background: C.group; border-radius: 12px; border-width: 1px; border-color: C.group-line; }
+component Separator inherits Rectangle { height: 1px; background: C.sep; }
+component Spacer inherits Rectangle { background: transparent; horizontal-stretch: 1; vertical-stretch: 1; }
+// Grouped-form row (EZP Settings): icon badge · label · trailing control.
+component FormRow inherits Rectangle {
+    in property <string> label; in property <string> detail; in property <int> icon: -1; in property <color> tint: C.gray; in property <bool> last;
+    min-height: 44px;
+    HorizontalLayout {
+        padding-left: 12px; padding-right: 12px; padding-top: 8px; padding-bottom: 8px; spacing: 12px;
+        if root.icon >= 0: Rectangle {width:28px;IconBadge {kind:root.icon;tint:root.tint;y:(parent.height - self.height)/2;}}
+        VerticalLayout {alignment:center;spacing:2px;horizontal-stretch:1;
+            Text {text:root.label;color:C.text;font-size:13px;wrap:word-wrap;}
+            if root.detail != "": Caption {text:root.detail;}
+        }
+        VerticalLayout {alignment:center;horizontal-stretch:0;HorizontalLayout {alignment:end;spacing:8px; @children }}
+    }
+    if !root.last: Rectangle {x:root.icon >= 0 ? 52px : 12px;y:parent.height - 1px;height:1px;width:parent.width - self.x - 12px;background:C.sep;}
+}
+component GroupLabel inherits Text { color: C.text2; font-size: 11px; font-weight: 600; }
+component SidebarItem inherits Rectangle {
+    in property <string> text; in property <int> icon; in property <color> tint: C.accent; in property <bool> active;
+    callback clicked();
+    height: 30px; border-radius: 6px;
+    background: root.active ? C.sidebar-sel : (hit.has-hover ? C.hover : transparent);
+    HorizontalLayout {padding-left:8px;padding-right:8px;spacing:9px;
+        IconSlot {kind:root.icon;ink:root.tint;size:17px;}
+        Text {text:root.text;color:C.text;font-size:13px;font-weight:root.active ? 600 : 400;vertical-alignment:center;horizontal-stretch:1;overflow:elide;}
+    }
+    accessible-role: button; accessible-label: root.text; accessible-action-default => {root.clicked();}
+    hit := TouchArea {clicked=>{root.clicked();}}
+}
+component StatusChip inherits Rectangle {
+    in property <string> text; in property <color> tint;
+    height: 22px; border-radius: 11px; background: root.tint.with-alpha(0.14); min-width: chip.preferred-width; horizontal-stretch: 0;
+    chip := HorizontalLayout {padding-left:9px;padding-right:10px;spacing:6px;
+        Rectangle {width:7px;Rectangle {width:7px;height:7px;border-radius:3.5px;background:root.tint;y:(parent.height - self.height)/2;}}
+        Text {text:root.text;color:C.text;font-size:11px;vertical-alignment:center;}
+    }
+}
+component Banner inherits Rectangle {
+    in property <string> text; in property <color> tint: C.orange;
+    min-height: 36px; border-radius: 8px; background: root.tint.with-alpha(0.12); border-width: 1px; border-color: root.tint.with-alpha(0.35);
+    HorizontalLayout {padding-left:12px;padding-right:12px;padding-top:8px;padding-bottom:8px;spacing:9px;
+        IconSlot {kind:43;ink:root.tint;}
+        Text {text:root.text;color:C.text;font-size:12px;vertical-alignment:center;horizontal-stretch:1;wrap:word-wrap;}
+        @children
+    }
+}
+component SelectRow inherits Rectangle {
+    in property <string> text; in property <string> detail; in property <int> icon: -1; in property <bool> active; in property <bool> enabled: true;
+    callback clicked();
+    min-height: 32px; border-radius: 6px;
+    background: root.active ? C.accent : (hit.has-hover && root.enabled ? C.hover : transparent);
+    HorizontalLayout {padding-left:8px;padding-right:8px;padding-top:6px;padding-bottom:6px;spacing:8px;
+        if root.icon >= 0: IconSlot {kind:root.icon;ink:root.active ? #FFFFFF : C.text2;}
+        Text {text:root.text;color:root.active ? #FFFFFF : C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;overflow:elide;}
+        if root.detail != "": Text {text:root.detail;color:root.active ? #FFFFFFCC : C.text2;font-size:11px;vertical-alignment:center;horizontal-alignment:right;overflow:elide;max-width:130px;}
+    }
+    opacity: root.enabled ? 1 : 0.55;
+    accessible-role: list-item; accessible-label: root.text; accessible-enabled: root.enabled; accessible-item-selected: root.active;
+    accessible-action-default => { if(root.enabled){root.clicked();} }
+    hit := TouchArea {enabled:root.enabled;clicked=>{root.clicked();}}
+}
+component Swatches inherits HorizontalLayout {
+    in property <bool> enabled: true; in property <[color]> tints; in property <[string]> codes;
+    callback selected(string);
+    height: 22px; spacing: 6px; alignment: start;
+    for tint[i] in root.tints: Rectangle {
+        width: 22px; background: tint; border-radius: 11px; border-width: 1px; border-color: C.sep;
+        accessible-role: button; accessible-label: L.t("Chọn màu ", "Pick colour ") + root.codes[i]; accessible-enabled: root.enabled;
+        accessible-action-default => { if(root.enabled){root.selected(root.codes[i]);} }
+        TouchArea {enabled:root.enabled;clicked=>{root.selected(root.codes[i]);}}
+    }
+}
+
+// ---------- Screen artwork ----------
+// Editor guides stay above the artwork and never become part of the exported image.
+component ScreenPreviewTarget inherits Rectangle {
+    in property <bool> active; in property <bool> circular; in property <bool> enabled: true; in property <string> name;
+    callback clicked();
+    background: hit.has-hover && root.enabled ? #FFFFFF14 : transparent;
+    border-width: 1px; border-color: #111827;
+    border-radius: root.circular ? self.height / 2 : 0px;
+    Rectangle {
+        x: 1px; y: 1px; width: parent.width - 2px; height: parent.height - 2px; background: transparent;
+        border-width: root.active ? 2px : 1px; border-color: root.active ? C.accent : #FFFFFF55;
+        border-radius: root.circular ? self.height / 2 : 0px;
+    }
+    accessible-role: button; accessible-label: root.name; accessible-enabled: root.enabled;
+    accessible-action-default => { if(root.enabled){root.clicked();} }
+    hit := TouchArea {enabled:root.enabled;clicked=>{root.clicked();}}
+}
+// Geometry matches the exported 160×80 composition at any preview size.
+component ArtworkPreview inherits Rectangle {
+    in property <image> artwork; in property <bool> enabled; in property <int> selected: -1; in property <bool> pixels; in property <bool> guides: true;
+    callback select-tile(int);
+    background: C.lcd;
+    Image {source:root.artwork;width:100%;height:100%;image-fit:fill;image-rendering:root.pixels ? ImageRendering.pixelated : ImageRendering.smooth;}
+    // Centre strip between the knobs is tile 10 (36,1 · 88×26 of 160×80).
+    if root.guides: ScreenPreviewTarget {x:root.width * 0.225;y:root.height * 0.0125;width:root.width * 0.55;height:root.height * 0.325;
+        active:root.selected == 10;enabled:root.enabled;name:L.t("Chỉnh ô giữa", "Edit centre tile");clicked=>{root.select-tile(10);}
+    }
+    if root.guides: Rectangle {
+        for i in 8: ScreenPreviewTarget {x:mod(i,4) * root.width / 4;y:root.height * 0.35 + floor(i / 4) * root.height * 0.325;width:root.width / 4;height:root.height * 0.325;
+            active:root.selected == i;enabled:root.enabled;name:L.t("Chỉnh ô phím ", "Edit key tile ") + (i + 1);clicked=>{root.select-tile(i);}
+        }
+        for knob in 2: ScreenPreviewTarget {x:root.width * (knob == 0 ? 0.05 : 0.8);y:root.height * 0.0125;width:root.width * 0.15;height:root.height * 0.3;circular:true;
+            active:root.selected == knob + 8;enabled:root.enabled;name:knob == 0 ? L.t("Chỉnh núm trái", "Edit left knob") : L.t("Chỉnh núm phải", "Edit right knob");clicked=>{root.select-tile(knob + 8);}
+        }
+    }
+}
+// One tile cut from the composed screen, so every key shows what its LCD cell displays.
+component TileArt inherits Rectangle {
+    in property <image> art; in property <int> tile; in property <bool> ready;
+    background: C.lcd; clip: true;
+    if root.ready: Image {
+        width: parent.width; height: parent.height; source: root.art; image-fit: contain;
+        source-clip-x: root.tile == 10 ? round(self.source.width * 0.225) : root.tile >= 8 ? round(self.source.width * (root.tile == 8 ? 0.05 : 0.8)) : round(mod(root.tile, 4) * self.source.width / 4);
+        source-clip-y: root.tile >= 8 ? round(self.source.height * 0.0125) : round(self.source.height * (0.35 + floor(root.tile / 4) * 0.325));
+        source-clip-width: root.tile == 10 ? round(self.source.width * 0.55) : root.tile >= 8 ? round(self.source.width * 0.15) : round(self.source.width / 4);
+        source-clip-height: root.tile == 10 ? round(self.source.height * 0.325) : root.tile >= 8 ? round(self.source.height * 0.3) : round(self.source.height * 0.325);
+    }
+}
+// Phosphor icons (the set EZP uses on Windows), searchable, drawn in the chosen weight.
+component SymbolPicker inherits VerticalLayout {
+    in property <bool> enabled; in property <[IconChoice]> choices; in-out property <string> name; in property <string> label; in-out property <int> weight; in-out property <string> query;
+    callback pick(string); callback search(string); callback weight-change();
+    property <length> cell: 40px;
+    property <int> cols: max(1, floor((self.width + 4px) / (self.cell + 4px)));
+    property <string> hovered;
+    spacing: 8px;
+    LineEdit {text<=>root.query;placeholder-text:L.t("Tìm biểu tượng, ví dụ nhạc, youtube…", "Search icons, e.g. music, youtube…");enabled:root.enabled;edited=>{root.search(self.text);}}
+    ScrollView {height:4 * (root.cell + 4px) + 4px;content-width:self.visible-width;content-height:ceil(root.choices.length / root.cols) * (root.cell + 4px);
+        for c[i] in root.choices: Rectangle {
+            x: mod(i, root.cols) * (root.cell + 4px); y: floor(i / root.cols) * (root.cell + 4px); width: root.cell; height: root.cell;
+            border-radius: 8px; background: c.name == root.name ? C.accent : (pick.has-hover && root.enabled ? C.fill-strong : C.fill);
+            Image {source:c.art;width:24px;height:24px;colorize:c.name == root.name ? #FFFFFF : C.text;}
+            accessible-role: button; accessible-label: c.label; accessible-enabled: root.enabled;
+            accessible-action-default => { if(root.enabled){root.pick(c.name);} }
+            pick := TouchArea {enabled:root.enabled;clicked=>{root.pick(c.name);}changed has-hover=>{root.hovered=self.has-hover ? c.label + " · " + c.name : "";}}
+        }
+    }
+    if root.choices.length == 0: Caption {text:L.t("Không tìm thấy biểu tượng.", "No matching icon.");}
+    Caption {text:root.hovered != "" ? root.hovered : root.label;wrap:no-wrap;overflow:elide;}
+    HorizontalLayout {spacing:10px;
+        Text {text:L.t("Nét", "Weight");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        EzSegmented {items:[L.t("Thường", "Regular"),L.t("Đậm", "Bold"),L.t("Đặc", "Fill")];current:root.weight;enabled:root.enabled;selected(i)=>{root.weight=i;root.weight-change();}}
+    }
+}
+component ClockControls inherits VerticalLayout {
+    in property <bool> enabled;
+    in-out property <int> face; in-out property <int> layout; in-out property <bool> hour24; in-out property <bool> ampm; in-out property <int> date;
+    callback commit();
+    spacing: 10px;
+    HorizontalLayout {spacing:10px;
+        Text {text:L.t("Kiểu đồng hồ", "Clock style");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        EzSegmented {items:[L.t("Thường", "Regular"),L.t("Đậm", "Bold"),"LED"];current:root.face;enabled:root.enabled;selected(i)=>{root.face=i;root.commit();}}
+    }
+    HorizontalLayout {spacing:10px;
+        Text {text:L.t("Hiển thị", "Show");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        ComboBox {width:172px;model:[L.t("Giờ + ngày", "Time + date"),L.t("Chỉ giờ", "Time only"),L.t("Giờ + thứ, ngày", "Time + weekday, date"),L.t("Giờ · ngày một dòng", "Time · date on one line")];current-index<=>root.layout;enabled:root.enabled;selected(t)=>{root.commit();}}
+    }
+    HorizontalLayout {spacing:10px;
+        Text {text:L.t("Giờ", "Hours");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        EzSegmented {items:[L.t("24 giờ", "24-hour"),L.t("12 giờ", "12-hour")];current:root.hour24 ? 0 : 1;enabled:root.enabled;selected(i)=>{root.hour24=i == 0;root.commit();}}
+    }
+    if !root.hour24: HorizontalLayout {spacing:10px;
+        Text {text:L.t("Hiện AM/PM", "Show AM/PM");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        EzSwitch {label:"AM/PM";checked:root.ampm;enabled:root.enabled;toggled(v)=>{root.ampm=v;root.commit();}}
+    }
+    if root.layout != 1: HorizontalLayout {spacing:10px;
+        Text {text:L.t("Ngày", "Date");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        ComboBox {width:172px;model:["dd/mm","dd/mm/yyyy","mm/dd/yyyy","yyyy-mm-dd"];current-index<=>root.date;enabled:root.enabled;selected(t)=>{root.commit();}}
+    }
+    Caption {text:L.t("Bàn phím nhận ảnh giờ mới mỗi phút khi Coban-mod đang chạy.", "The keyboard gets a new time image every minute while Coban-mod runs.");}
+}
+component ArtworkControls inherits VerticalLayout {
+    in property <bool> enabled;
+    in-out property <int> kind; in-out property <string> text; in-out property <int> text-size;
+    in property <string> image-name;
+    in property <[IconChoice]> symbol-choices; in-out property <string> symbol-name; in property <string> symbol-label; in-out property <int> symbol-weight; in-out property <string> symbol-query;
+    in-out property <int> clock-face; in-out property <int> clock-layout; in-out property <bool> clock-hour24; in-out property <bool> clock-ampm; in-out property <int> clock-date;
+    in-out property <int> icon-size; in-out property <bool> tint-image; in-out property <bool> use-common-ink; in-out property <string> cell-ink;
+    callback commit(); callback kind-change(); callback pick-image(); callback pick-symbol(string); callback symbol-search(string); callback symbol-weight-change();
+    spacing: 12px; alignment: start;
+    GroupLabel {text:L.t("NỘI DUNG Ô", "TILE CONTENT");}
+    EzSegmented {items:[L.t("Chữ", "Text"),L.t("Ảnh", "Image"),L.t("Biểu tượng", "Icon"),L.t("Giờ", "Clock"),L.t("Trống", "Empty")];current:root.kind;enabled:root.enabled;stretch:true;
+        selected(i)=>{root.kind=i;root.kind-change();}}
+    if root.kind == 0: VerticalLayout {spacing:8px;
+        TextEdit {text<=>root.text;height:70px;enabled:root.enabled;changed has-focus=>{if(!self.has-focus){root.commit();}}}
+        Caption {text:L.t("Tối đa 24 ký tự, có thể xuống dòng.", "Up to 24 characters, line breaks allowed.");}
+        HorizontalLayout {spacing:10px;
+            Text {text:L.t("Cỡ chữ", "Text size");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+            SpinBox {width:110px;value<=>root.text-size;minimum:6;maximum:16;enabled:root.enabled;edited=>{root.commit();}}
+        }
+    }
+    if root.kind == 1: VerticalLayout {spacing:8px;
+        HorizontalLayout {spacing:8px;
+            EzButton {text:root.image-name == "" ? L.t("Chọn ảnh…", "Choose image…") : L.t("Đổi ảnh…", "Change image…");icon:39;kind:1;enabled:root.enabled;clicked=>{root.pick-image();}}
+            Spacer {}
+        }
+        if root.image-name != "": Caption {text:root.image-name;}
+        CheckBox {text:L.t("Tô màu ảnh như icon", "Tint image like an icon");checked<=>root.tint-image;enabled:root.enabled;toggled=>{root.commit();}}
+    }
+    if root.kind == 2: SymbolPicker {enabled:root.enabled;choices:root.symbol-choices;name<=>root.symbol-name;label:root.symbol-label;weight<=>root.symbol-weight;query<=>root.symbol-query;
+        pick(n)=>{root.pick-symbol(n);} search(q)=>{root.symbol-search(q);} weight-change=>{root.symbol-weight-change();}}
+    if root.kind == 3: ClockControls {enabled:root.enabled;face<=>root.clock-face;layout<=>root.clock-layout;hour24<=>root.clock-hour24;ampm<=>root.clock-ampm;date<=>root.clock-date;commit=>{root.commit();}}
+    if root.kind == 1 || root.kind == 2: HorizontalLayout {spacing:10px;
+        Text {text:L.t("Cỡ icon", "Icon size");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        EzSegmented {items:[L.t("Lớn", "Large"),L.t("Vừa", "Medium"),L.t("Nhỏ", "Small")];current:root.icon-size;enabled:root.enabled;selected(i)=>{root.icon-size=i;root.commit();}}
+    }
+    if root.kind == 0 || root.kind == 2 || root.kind == 3 || (root.kind == 1 && root.tint-image): VerticalLayout {spacing:8px;
+        Separator {}
+        HorizontalLayout {spacing:10px;
+            Text {text:root.kind == 0 || root.kind == 3 ? L.t("Màu chữ riêng", "Own text colour") : L.t("Màu icon riêng", "Own icon colour");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+            EzSwitch {label:L.t("Màu riêng", "Own colour");checked:!root.use-common-ink;enabled:root.enabled;toggled(v)=>{root.use-common-ink=!v;root.commit();}}
+        }
+        if !root.use-common-ink: LineEdit {text<=>root.cell-ink;placeholder-text:"#RRGGBB";enabled:root.enabled;accepted=>{root.commit();}changed has-focus=>{if(!self.has-focus){root.commit();}}}
+        if !root.use-common-ink: Swatches {enabled:root.enabled;
+            tints:[#FFFFFF,#000000,#EF4444,#F59E0B,#FDE047,#22C55E,#38BDF8,#A78BFA];
+            codes:["#FFFFFF","#000000","#EF4444","#F59E0B","#FDE047","#22C55E","#38BDF8","#A78BFA"];
+            selected(code)=>{root.cell-ink=code;root.commit();}}
+    }
+}
+component ArtworkBackground inherits VerticalLayout {
+    in property <bool> enabled;
+    in-out property <int> bg-kind; in-out property <string> bg-color; in property <string> bg-name; in-out property <string> ink-color; in-out property <bool> tile-background;
+    callback commit(); callback pick-image(); callback change-kind(); callback preset-color(string);
+    spacing: 12px; alignment: start;
+    GroupLabel {text:L.t("NỀN MÀN HÌNH", "SCREEN BACKGROUND");}
+    EzSegmented {items:[L.t("Đơn sắc", "Solid colour"),L.t("Ảnh nền", "Image")];current:root.bg-kind;enabled:root.enabled;stretch:true;selected(i)=>{root.bg-kind=i;root.change-kind();}}
+    if root.bg-kind == 0: LineEdit {text<=>root.bg-color;placeholder-text:"#101827";enabled:root.enabled;accepted=>{root.commit();}changed has-focus=>{if(!self.has-focus){root.commit();}}}
+    if root.bg-kind == 0: Swatches {enabled:root.enabled;
+        tints:[#101827,#000000,#FFFFFF,#1E3A8A,#7F1D1D,#14532D,#4C1D95,#334155];
+        codes:["#101827","#000000","#FFFFFF","#1E3A8A","#7F1D1D","#14532D","#4C1D95","#334155"];
+        selected(code)=>{root.preset-color(code);}}
+    if root.bg-kind == 1: HorizontalLayout {spacing:8px;
+        EzButton {text:root.bg-name == "" ? L.t("Chọn ảnh nền…", "Choose background…") : L.t("Đổi ảnh nền…", "Change background…");icon:39;kind:1;enabled:root.enabled;clicked=>{root.pick-image();}}
+        Spacer {}
+    }
+    if root.bg-kind == 1 && root.bg-name != "": Caption {text:root.bg-name;}
+    Separator {}
+    HorizontalLayout {spacing:10px;
+        Text {text:L.t("Màu chữ chung", "Common text colour");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+        LineEdit {width:110px;text<=>root.ink-color;placeholder-text:"#RRGGBB";enabled:root.enabled;accepted=>{root.commit();}changed has-focus=>{if(!self.has-focus){root.commit();}}}
+    }
+    HorizontalLayout {spacing:10px;
+        Text {text:L.t("Nền ô phím để dễ đọc", "Tile backing for legibility");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;wrap:word-wrap;}
+        EzSwitch {label:L.t("Nền ô phím", "Tile backing");checked:root.tile-background;enabled:root.enabled;toggled(v)=>{root.tile-background=v;root.commit();}}
+    }
+}
+
+// ---------- Coban Pad 10A mock-up ----------
+component KeyCap inherits Rectangle {
+    in property <FunctionView> data; in property <string> name; in property <bool> active; in property <bool> enabled: true;
+    in property <image> art; in property <int> tile; in property <bool> art-ready;
+    callback clicked();
+    height: 124px; min-width: 100px; preferred-width: 120px; horizontal-stretch: 1;
+    border-radius: 12px; background: C.keycap;
+    border-width: root.active ? 2px : 1px; border-color: root.active ? C.accent : (hit.has-hover && root.enabled ? C.text3 : C.keycap-edge);
+    drop-shadow-blur: 4px; drop-shadow-offset-y: 2px; drop-shadow-color: root.active ? #007AFF40 : #0000001F;
+    VerticalLayout {padding:8px;spacing:6px;
+        TileArt {height:54px;border-radius:6px;art:root.art;tile:root.tile;ready:root.art-ready;}
+        Text {text:root.data.title;color:C.text;font-size:12px;font-weight:600;horizontal-alignment:center;overflow:elide;}
+        Text {text:root.data.detail;color:C.text2;font-size:10px;horizontal-alignment:center;overflow:elide;}
+    }
+    opacity: root.enabled ? 1 : 0.6;
+    accessible-role: button; accessible-label: root.name + ": " + root.data.title; accessible-enabled: root.enabled;
+    accessible-action-default => { if(root.enabled){root.clicked();} }
+    hit := TouchArea {enabled:root.enabled;clicked=>{root.clicked();}}
+}
+component TurnChip inherits Rectangle {
+    in property <FunctionView> data; in property <bool> clockwise; in property <string> name; in property <bool> active; in property <bool> enabled;
+    callback clicked();
+    height: 24px; border-radius: 12px; min-width: 44px; max-width: 66px; horizontal-stretch: 1;
+    background: root.active ? C.accent : (hit.has-hover && root.enabled ? C.fill-strong : C.fill);
+    HorizontalLayout {padding-left:7px;padding-right:9px;spacing:4px;
+        IconSlot {kind:root.clockwise ? 28 : 27;ink:root.active ? #FFFFFF : C.text2;size:13px;}
+        Text {text:root.data.title;color:root.active ? #FFFFFF : C.text;font-size:11px;vertical-alignment:center;overflow:elide;}
+    }
+    accessible-role: button; accessible-label: root.name + ": " + root.data.title; accessible-enabled: root.enabled;
+    accessible-action-default => { if(root.enabled){root.clicked();} }
+    hit := TouchArea {enabled:root.enabled;clicked=>{root.clicked();}}
+}
+component KnobUnit inherits VerticalLayout {
+    in property <FunctionView> press; in property <FunctionView> left; in property <FunctionView> right;
+    in property <int> base; in property <int> selected; in property <bool> enabled; in property <string> side;
+    in property <image> art; in property <bool> art-ready;
+    callback pick(int);
+    spacing: 8px; alignment: center; width: 136px;
+    HorizontalLayout {alignment:center;
+        Rectangle {
+            width: 76px; height: 76px; border-radius: 38px; background: C.keycap;
+            border-width: root.selected == root.base ? 3px : 1px; border-color: root.selected == root.base ? C.accent : (hit.has-hover && root.enabled ? C.text3 : C.keycap-edge);
+            drop-shadow-blur: 5px; drop-shadow-offset-y: 2px; drop-shadow-color: #00000026;
+            TileArt {x:12px;y:12px;width:52px;height:52px;border-radius:26px;art:root.art;tile:root.base + 8;ready:root.art-ready;}
+            // Round mask: the screen tile is square, the knob face is not.
+            Rectangle {x:1px;y:1px;width:74px;height:74px;border-radius:37px;border-width:11px;border-color:C.keycap;background:transparent;}
+            accessible-role: button; accessible-label: root.side + " · " + L.t("Nhấn", "Press") + ": " + root.press.title; accessible-enabled: root.enabled;
+            accessible-action-default => { if(root.enabled){root.pick(root.base);} }
+            hit := TouchArea {enabled:root.enabled;clicked=>{root.pick(root.base);}}
+        }
+    }
+    Text {text:root.press.title;color:C.text;font-size:12px;font-weight:600;horizontal-alignment:center;overflow:elide;}
+    HorizontalLayout {spacing:4px;alignment:center;
+        TurnChip {name:root.side + " · " + L.t("Xoay trái", "Turn left");data:root.left;active:root.selected == 10 + root.base * 2;enabled:root.enabled;clicked=>{root.pick(10 + root.base * 2);}}
+        TurnChip {name:root.side + " · " + L.t("Xoay phải", "Turn right");data:root.right;clockwise:true;active:root.selected == 11 + root.base * 2;enabled:root.enabled;clicked=>{root.pick(11 + root.base * 2);}}
+    }
+}
+component FunctionRow inherits Rectangle {
+    in property <FunctionView> data; in property <bool> active; in property <bool> enabled;
+    callback clicked();
+    height: 40px; border-radius: 8px;
+    background: root.active ? C.accent-soft : (hit.has-hover && root.enabled ? C.hover : transparent);
+    border-width: root.active ? 1px : 0px; border-color: C.accent;
+    HorizontalLayout {padding-left:8px;padding-right:10px;spacing:10px;
+        Rectangle {width:26px;IconBadge {kind:root.data.icon;size:26px;tint:root.active ? C.accent : C.gray;y:(parent.height - self.height)/2;}}
+        Text {text:root.data.title;color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;overflow:elide;}
+        Text {text:root.data.detail;color:C.text2;font-size:11px;vertical-alignment:center;horizontal-alignment:right;overflow:elide;max-width:110px;}
+    }
+    opacity: root.enabled ? 1 : 0.55;
+    accessible-role: button; accessible-label: L.t("Gán ", "Assign ") + root.data.title; accessible-enabled: root.enabled;
+    accessible-action-default => { if(root.enabled){root.clicked();} }
+    hit := TouchArea {enabled:root.enabled;clicked=>{root.clicked();}}
+}
+component SettingRow inherits Rectangle {
+    in property <SettingField> field; in property <bool> enabled; in property <bool> last;
+    callback edited(int);
+    property <float> preview: root.field.value;
+    min-height: 46px;
+    HorizontalLayout {padding-left:14px;padding-right:14px;padding-top:8px;padding-bottom:8px;spacing:12px;
+        Text {text:root.field.label;color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;wrap:word-wrap;}
+        if root.field.kind == 0: SpinBox {width:120px;value:root.field.value;minimum:0;maximum:root.field.maximum;enabled:root.enabled;edited(v)=>{root.edited(v);}}
+        if root.field.kind == 2: Rectangle {width:44px;EzSwitch {y:(parent.height - self.height)/2;label:root.field.label;checked:root.field.value > 0;enabled:root.enabled;toggled(v)=>{root.edited(v ? 1 : 0);}}}
+        if root.field.kind == 3: ComboBox {width:260px;model:root.field.options;current-index:root.field.option-index;enabled:root.enabled;selected(t)=>{root.edited(root.field.option-values[self.current-index]);}}
+        if root.field.kind == 1: Slider {
+            width: 240px; value <=> root.preview; minimum: 0; maximum: root.field.maximum; enabled: root.enabled;
+            released(v) => { root.edited(round(v)); }
+            accessible-action-set-value(v) => { if(v.is-float()){self.value=clamp(v.to-float(),self.minimum,self.maximum);root.edited(round(self.value));} }
+            accessible-action-increment => { self.value=min(self.maximum,self.value + 1);root.edited(round(self.value)); }
+            accessible-action-decrement => { self.value=max(self.minimum,self.value - 1);root.edited(round(self.value)); }
+        }
+        if root.field.kind == 1: Text {width:40px;text:round(root.preview * 100 / max(1, root.field.maximum)) + "%";color:C.text2;font-size:12px;horizontal-alignment:right;vertical-alignment:center;}
+    }
+    if !root.last: Rectangle {x:14px;y:parent.height - 1px;height:1px;width:parent.width - 28px;background:C.sep;}
+}
+
+export component MKTray inherits SystemTrayIcon {
+    icon: @image-url("../assets/mk.svg"); tooltip: "Coban-mod · Bao-keyboard";
+    callback open-editor(); callback open-settings(); callback quit-app(); clicked=>{root.open-editor();}
+    Menu { MenuItem {title:"Mở Coban-mod";activated=>{root.open-editor();}} MenuItem {title:"Cài đặt…";activated=>{root.open-settings();}} MenuSeparator {} MenuItem {title:"Thoát Coban-mod";activated=>{root.quit-app();}} }
+}
+
+export component MainWindow inherits Window {
+    in property <string> app-version;
+    in property <bool> is-macos;
+    in property <bool> has-host-bindings;
+    in property <string> window-title: "Coban-mod · Bao-keyboard";
+    title: root.window-title; icon: @image-url("../assets/mk.svg");
+    preferred-width: 1240px; preferred-height: 860px; min-width: 1100px; min-height: 760px;
+    background: C.win; default-font-size: 13px;
+    // 0 follows the system, 1 light, 2 dark (Coban Connect: Tự động / Sáng / Tối).
+    in-out property <int> theme-mode: 0;
+    in-out property <bool> dark;
+    in-out property <bool> en: false;
+    // Live until the first manual choice assigns Palette.color-scheme; the last value is kept.
+    property <bool> system-dark-live: Palette.color-scheme == ColorScheme.dark;
+    property <bool> system-dark;
+    property <bool> palette-assigned;
+    init => { root.system-dark = root.system-dark-live; root.apply-theme(); L.en = root.en; }
+    changed system-dark-live => { if(root.theme-mode == 0){ root.system-dark = root.system-dark-live; root.apply-theme(); } }
+    changed theme-mode => { root.apply-theme(); }
+    changed en => { L.en = root.en; }
+    function apply-theme() {
+        root.dark = root.theme-mode == 0 ? root.system-dark : root.theme-mode == 2;
+        C.dark = root.dark;
+        if(root.theme-mode != 0){
+            Palette.color-scheme = root.theme-mode == 2 ? ColorScheme.dark : ColorScheme.light;
+            root.palette-assigned = true;
+        } else if(root.palette-assigned){
+            Palette.color-scheme = ColorScheme.unknown;
+        }
+    }
+    in property <bool> connected;
+    in property <bool> busy;
+    in property <bool> stale;
+    in property <bool> can-undo;
+    in property <string> status: "Đang tìm Bao-keyboard…";
+    in property <bool> status-error;
+    in property <[string]> devices;
+    in-out property <int> device-index: 0;
+    in-out property <int> page: 0;
+    in property <[string]> layers;
+    in-out property <int> layer: 0;
+    in property <int> active-layer: -1;
+    in property <int> displayed-layer: -1;
+    in property <string> layer-sync-message;
+    in property <bool> layer-sync-supported;
+    in property <bool> layer-sync-image-safe;
+    in property <bool> layer-sync-enabled;
+    in-out property <bool> follow-layer: true;
+    in-out property <int> selected-key: 2;
+    // 0: function, 1: tile artwork, 2: screen background.
+    in-out property <int> key-panel: 0;
+    in property <[FunctionView]> bindings;
+    in property <FunctionView> selected-function;
+    in property <string> assignment-target;
+    in property <bool> can-name-key;
+    in-out property <string> key-display-name;
+    in-out property <bool> key-name-editing;
+    in-out property <string> search;
+    in-out property <int> category: 0;
+    in-out property <int> key-group: 0;
+    in property <[FunctionView]> functions;
+    in-out property <bool> advanced;
+    in-out property <string> chord-input;
+    in property <[string]> macro-list;
+    in-out property <int> macro-index: 0;
+    in-out property <string> macro-name;
+    in-out property <string> macro-display-name;
+    in-out property <bool> macro-name-editing;
+    in property <[StepView]> steps;
+    in-out property <int> step-index: -1;
+    in-out property <int> step-kind: 0;
+    in-out property <string> step-text;
+    in property <bool> macro-editable;
+    in property <string> macro-info;
+    in property <[string]> settings-list;
+    in-out property <int> setting-index: 0;
+    in property <[SettingField]> setting-fields;
+    in property <bool> stats-selected;
+    in property <string> screen-title: "Màn hình";
+    in property <bool> screen-is-gif;
+    in-out property <int> screen-mode-index;
+    in-out property <int> screen-source;
+    in-out property <bool> screen-more-settings;
+    in property <bool> layout-loaded;
+    in property <bool> layout-preview-pending;
+    in property <image> layout-preview;
+    in property <image> layout-sharp-preview;
+    in-out property <bool> layout-show-pixels: false;
+    in-out property <int> layout-tile;
+    in property <string> layout-cell-label;
+    in-out property <int> layout-kind;
+    in-out property <string> layout-text;
+    in-out property <int> layout-text-size: 12;
+    in-out property <int> layout-bg-kind;
+    in-out property <string> layout-bg-color: "#101827";
+    in-out property <string> layout-ink-color: "#FFFFFF";
+    in-out property <bool> layout-use-common-ink: true;
+    in-out property <string> layout-cell-ink: "#FFFFFF";
+    in-out property <int> layout-icon-size;
+    in-out property <bool> layout-tint-image;
+    in-out property <bool> layout-tile-background: true;
+    in property <string> layout-bg-name;
+    in property <string> layout-image-name;
+    in-out property <string> layout-symbol-name: "star";
+    in-out property <int> layout-symbol-weight: 2;
+    in property <string> layout-symbol-label;
+    in-out property <string> layout-symbol-query;
+    in property <[IconChoice]> layout-symbol-choices;
+    in-out property <int> layout-clock-face;
+    in-out property <int> layout-clock-layout;
+    in-out property <bool> layout-clock-hour24: true;
+    in-out property <bool> layout-clock-ampm: true;
+    in-out property <int> layout-clock-date;
+    in property <bool> layout-save-failed;
+    in property <string> layout-status: "Ảnh được lưu riêng theo lớp.";
+    in property <string> clock-text;
+    in property <string> device-detail;
+    in property <string> backup-info;
+    in property <string> warnings;
+    in property <[string]> history;
+    in-out property <string> host-name: "Mặc định";
+    in-out property <string> host-app;
+    in-out property <string> host-text;
+    in-out property <int> host-trigger: 0;
+    in property <[string]> host-triggers;
+    in-out property <string> host-trigger-name;
+    in-out property <bool> host-trigger-name-editing;
+    in-out property <int> host-kind: 0;
+    in property <[string]> host-profiles;
+    in-out property <int> host-profile-index: -1;
+    in property <bool> host-running;
+    in property <bool> host-enabled;
+    in-out property <bool> host-login-enabled;
+    in property <bool> host-login-available;
+    in property <string> host-login-status;
+    in property <string> host-status: "Coban-mod Agent phục vụ thiết bị cùng ứng dụng.";
+    callback discover(); callback connect-device(); callback read-device(); callback process-updates();
+    callback confirm-layer();
+    callback follow-layer-change(bool);
+    callback change-page(int); callback select-layer(int); callback select-key(int); callback select-position(int); callback search-function(string); callback select-category(int); callback select-key-group(int);
+    callback assign(int); callback assign-text(string); callback undo(); callback key-name-commit(); callback macro-display-name-commit(); callback host-trigger-name-commit();
+    callback select-macro(int); callback macro-name-commit(string); callback select-step(int); callback step-commit(string); callback change-step-kind(int); callback add-step(int); callback remove-step(); callback bind-macro(int);
+    callback select-setting(int); callback set-field(int,int); callback backup(); callback restore(); callback sync-clock(); callback upload-image(); callback open-backups();
+    callback layout-kind-change(); callback screen-mode-change(); callback screen-source-change(); callback layout-select-tile(int); callback layout-commit(); callback layout-bg-change(); callback layout-pick-image(bool); callback layout-pick-symbol(string); callback layout-symbol-search(string); callback layout-symbol-weight-change(); callback layout-apply(); callback layout-reload();
+    callback layout-preset-color(string); callback layout-select-background();
+    callback host-select(int); callback host-new(); callback host-commit(); callback host-toggle(); callback host-remove(); callback host-pick-app(); callback host-pick-target(); callback host-test(); callback host-change-kind(); callback host-open-permissions(); callback host-login-toggle(bool); callback stop-agent();
+
+    property <bool> editable: root.connected && !root.busy;
+    property <bool> art-ready: root.layout-loaded;
+    property <bool> composing-screen: root.page == 3 && root.screen-is-gif && root.screen-source == 1 && !root.screen-more-settings;
+    property <bool> has-tile: root.selected-key < 10;
+    property <[string]> page-titles: [L.t("Coban-mod", "Coban-mod"), "Macro", L.t("Đèn phím", "Lighting"), L.t("Màn hình", "Display"), L.t("Âm thanh", "Audio"), L.t("Tự động hóa", "Automation"), L.t("Sao lưu & khôi phục", "Backup & restore"), L.t("Cài đặt", "Settings")];
+    property <string> service-label: root.host-running ? L.t("Đang nhận phím", "Receiving keys") : root.host-enabled ? L.t("Đang khởi động", "Starting") : root.connected ? L.t("Đang bật…", "Turning on…") : L.t("Chờ bàn phím", "Waiting for keyboard");
+    property <color> service-tint: root.host-running ? C.green : C.orange;
+    // Screen tiles 0–7 are keys 1–8 (positions 2–9); tiles 8/9 are the knobs (positions 0/1).
+    function tile-position(tile: int) -> int { return tile >= 8 ? tile - 8 : tile + 2; }
+    function pick-position(index: int) { root.select-position(index); }
+
+    HorizontalLayout {
+        padding: 0px; spacing: 0px;
+        // ---------- Sidebar ----------
+        Rectangle {
+            width: 212px; background: C.sidebar;
+            Rectangle {x:parent.width - 1px;width:1px;background:C.sep;}
+            VerticalLayout {
+                padding-left: 10px; padding-right: 10px; padding-top: 16px; padding-bottom: 12px; spacing: 2px;
+                HorizontalLayout {padding-left:6px;padding-bottom:12px;spacing:10px;height:52px;
+                    Rectangle {width:34px;Image {source:@image-url("../assets/mk.svg");width:34px;height:34px;y:(parent.height - self.height)/2;}}
+                    VerticalLayout {alignment:center;spacing:1px;
+                        Text {text:"Coban-mod";color:C.text;font-size:15px;font-weight:700;}
+                        Text {text:root.connected ? L.t("● Bao-keyboard", "● Bao-keyboard") : L.t("○ Chưa kết nối", "○ Not connected");color:root.connected ? C.green : C.text2;font-size:11px;}
+                    }
+                }
+                SidebarItem {text:"Coban-mod";icon:38;tint:C.purple;active:root.page == 0;clicked=>{root.change-page(0);}}
+                Rectangle {height:14px;}
+                GroupLabel {text:L.t("Bàn phím", "Keyboard");height:22px;vertical-alignment:center;x:8px;}
+                SidebarItem {text:"Macro";icon:21;active:root.page == 1;clicked=>{root.change-page(1);}}
+                SidebarItem {text:root.page-titles[2];icon:23;tint:C.yellow;active:root.page == 2;clicked=>{root.change-page(2);}}
+                SidebarItem {text:root.page-titles[3];icon:22;tint:C.teal;active:root.page == 3;clicked=>{root.change-page(3);}}
+                SidebarItem {text:root.page-titles[4];icon:10;tint:C.pink;active:root.page == 4;clicked=>{root.change-page(4);}}
+                SidebarItem {text:root.page-titles[6];icon:41;tint:C.green;active:root.page == 6;clicked=>{root.change-page(6);}}
+                Rectangle {height:14px;}
+                GroupLabel {text:L.t("Máy tính", "Computer");height:22px;vertical-alignment:center;x:8px;}
+                SidebarItem {text:root.page-titles[5];icon:42;tint:C.orange;active:root.page == 5;clicked=>{root.change-page(5);}}
+                Spacer {}
+                SidebarItem {text:root.page-titles[7];icon:37;tint:C.gray;active:root.page == 7;clicked=>{root.change-page(7);}}
+                Rectangle {height:8px;}
+                HorizontalLayout {padding-left:8px;spacing:6px;height:18px;
+                    Text {text:"Coban-mod " + root.app-version;color:C.text3;font-size:10px;vertical-alignment:center;horizontal-stretch:1;}
+                    Rectangle {width:86px;border-radius:4px;background:#1E1E1E;Image {source:@image-url("../assets/made-with-slint-dark.svg");x:3px;y:3px;width:80px;height:12px;image-fit:contain;}}
+                }
+            }
+        }
+        // ---------- Content ----------
+        VerticalLayout {
+            padding: 0px; spacing: 0px; horizontal-stretch: 1;
+            Rectangle {
+                height: 52px; background: C.win;
+                Rectangle {y:parent.height - 1px;height:1px;background:C.sep;}
+                HorizontalLayout {padding-left:22px;padding-right:16px;spacing:10px;
+                    Text {text:root.page-titles[root.page];color:C.text;font-size:17px;font-weight:700;vertical-alignment:center;}
+                    Spacer {}
+                    VerticalLayout {alignment:center;HorizontalLayout {spacing:10px;
+                    if root.devices.length > 1: ComboBox {width:220px;model:root.devices;current-index<=>root.device-index;enabled:!root.busy;selected(i)=>{root.connect-device();}}
+                    StatusChip {
+                        text: root.busy ? L.t("Đang lưu…", "Saving…") : root.connected ? L.t("Đã kết nối", "Connected") : L.t("Chưa kết nối", "Disconnected");
+                        tint: root.busy ? C.accent : root.connected ? C.green : C.orange;
+                    }
+                    if root.can-undo: EzButton {text:L.t("Hoàn tác", "Undo");icon:4;enabled:root.connected && !root.busy && !root.stale;clicked=>{root.undo();}}
+                    EzButton {
+                        text: root.connected ? L.t("Đọc lại", "Refresh") : (root.devices.length > 0 ? L.t("Kết nối lại", "Reconnect") : L.t("Tìm bàn phím", "Find keyboard"));
+                        icon: 49; kind: root.connected ? 0 : 1; enabled: !root.busy;
+                        clicked => { if(root.connected){root.read-device();} else if(root.devices.length > 0){root.connect-device();} else {root.discover();} }
+                    }
+                    }}
+                }
+            }
+            VerticalLayout {
+                padding: 20px; spacing: 14px; vertical-stretch: 1;
+                if !root.connected && root.page != 7 && root.page != 5: Banner {
+                    text: root.stale ? L.t("Chưa xác minh cấu hình. Kết nối hoặc đọc lại trước khi chỉnh tiếp.", "Configuration not verified. Reconnect or refresh before editing.") : L.t("Cắm Bao-keyboard qua USB để chỉnh phím và thiết lập.", "Plug in Bao-keyboard over USB to edit keys and settings.");
+                }
+
+                // ---------- 0 · Coban-mod ----------
+                if root.page == 0: HorizontalLayout {
+                    spacing: 18px; vertical-stretch: 1;
+                    VerticalLayout {
+                        spacing: 14px; horizontal-stretch: 1;
+                        HorizontalLayout {spacing:10px;
+                            if root.layers.length > 0: EzSegmented {toolbar:true;prominent:true;items:root.layers;current:root.layer;enabled:root.editable;selected(i)=>{root.select-layer(i);}}
+                            Spacer {}
+                            if root.has-host-bindings: StatusChip {text:root.service-label;tint:root.service-tint;}
+                        }
+                        HorizontalLayout {spacing:10px;
+                            EzSwitch {label:L.t("Theo lớp bàn phím", "Follow keyboard layer");checked:root.follow-layer;enabled:root.editable;toggled(v)=>{root.follow-layer=v;root.follow-layer-change(v);}}
+                            Text {text:L.t("Theo lớp bàn phím", "Follow keyboard layer");color:C.text;font-size:12px;}
+                            Text {text:root.active-layer < 0 ? L.t("Chưa đồng bộ lớp", "Layer not synchronized") : L.t("Bàn phím: lớp ", "Keyboard: layer ") + (root.active-layer + 1);color:C.accent;font-size:13px;font-weight:600;horizontal-stretch:1;}
+                            EzButton {text:root.layer-sync-enabled ? L.t("Tắt tự đổi ảnh", "Stop image sync") : L.t("Bật tự đổi ảnh", "Enable image sync");icon:20;enabled:root.editable && root.layout-loaded && ((root.layer-sync-supported && root.layer-sync-image-safe) || root.layer-sync-enabled);clicked=>{root.confirm-layer();}}
+                        }
+                        Text {text:root.layer-sync-message;color:C.text3;font-size:11px;wrap:word-wrap;}
+                        Rectangle {
+                            vertical-stretch: 0; background: C.device; border-radius: 24px; border-width: 1px; border-color: C.device-line;
+                            drop-shadow-blur: 18px; drop-shadow-offset-y: 6px; drop-shadow-color: #00000022;
+                            VerticalLayout {padding:22px;spacing:16px;
+                                HorizontalLayout {spacing:14px;alignment:space-between;
+                                    KnobUnit {base:0;side:L.t("Núm trái", "Left knob");press:root.bindings[0];left:root.bindings[10];right:root.bindings[11];
+                                        selected:root.key-panel >= 2 ? -1 : root.selected-key;enabled:root.editable;art:root.layout-sharp-preview;art-ready:root.art-ready;pick(i)=>{root.pick-position(i);}}
+                                    VerticalLayout {spacing:6px;alignment:center;
+                                        Rectangle {
+                                            width: 252px; height: 134px; border-radius: 10px; background: #050608;
+                                            border-width: root.key-panel == 2 ? 2px : 1px; border-color: root.key-panel == 2 ? C.accent : #FFFFFF1A;
+                                            ArtworkPreview {x:6px;y:7px;width:240px;height:120px;artwork:root.layout-sharp-preview;
+                                                enabled:root.editable && root.layout-loaded;
+                                                selected:root.key-panel == 2 ? -1 : root.key-panel == 3 ? 10 : (root.has-tile ? (root.selected-key < 2 ? root.selected-key + 8 : root.selected-key - 2) : -1);
+                                                select-tile(i)=>{if(i == 10){root.layout-select-tile(10);}else{root.pick-position(root.tile-position(i));root.key-panel=1;}}
+                                            }
+                                            if root.layout-preview-pending: Rectangle {x:parent.width - 26px;y:6px;width:20px;height:20px;border-radius:10px;background:#000000AA;IconSlot {x:3px;kind:32;ink:#FFFFFF;size:14px;}}
+                                        }
+                                        Text {text:L.t("Màn hình · chạm ô để đổi ảnh", "Screen · tap a tile to change it");color:C.text2;font-size:10px;horizontal-alignment:center;}
+                                    }
+                                    KnobUnit {base:1;side:L.t("Núm phải", "Right knob");press:root.bindings[1];left:root.bindings[12];right:root.bindings[13];
+                                        selected:root.key-panel >= 2 ? -1 : root.selected-key;enabled:root.editable;art:root.layout-sharp-preview;art-ready:root.art-ready;pick(i)=>{root.pick-position(i);}}
+                                }
+                                for row in 2: HorizontalLayout {spacing:12px;
+                                    for col in 4: KeyCap {
+                                        name: L.t("Phím ", "Key ") + (row * 4 + col + 1); data: root.bindings[row * 4 + col + 2];
+                                        active: root.key-panel < 2 && root.selected-key == row * 4 + col + 2; enabled: root.editable;
+                                        art: root.layout-sharp-preview; tile: row * 4 + col; art-ready: root.art-ready;
+                                        clicked => { root.pick-position(row * 4 + col + 2); }
+                                    }
+                                }
+                                HorizontalLayout {
+                                    Text {text:"COBAN PAD 10A";color:C.text3;font-size:10px;font-weight:600;letter-spacing:1px;}
+                                    Spacer {}
+                                    Text {text:"Bao-keyboard · " + (root.layers.length > root.layer ? root.layers[root.layer] : "");color:C.text3;font-size:10px;}
+                                }
+                            }
+                        }
+                        Caption {text:L.t("Chức năng tự lưu vào bàn phím. Ảnh lưu riêng theo lớp và gửi khi lớp đó hoạt động.", "Functions save to the keyboard. Artwork saves per layer and is sent when that layer is active.");}
+                        Spacer {}
+                    }
+                    // Inspector
+                    Card {
+                        width: 340px;
+                        VerticalLayout {padding:16px;spacing:12px;
+                            if root.key-panel == 3: HorizontalLayout {spacing:12px;height:44px;
+                                Rectangle {width:40px;IconBadge {kind:22;tint:C.teal;size:40px;y:(parent.height - self.height)/2;}}
+                                VerticalLayout {alignment:center;spacing:2px;horizontal-stretch:1;
+                                    Caption {text:L.t("Màn hình · giữa hai núm", "Screen · between the knobs");wrap:no-wrap;overflow:elide;}
+                                    Text {text:L.t("Ô giữa", "Centre tile");color:C.text;font-size:16px;font-weight:700;overflow:elide;}
+                                }
+                            }
+                            if root.key-panel < 2: HorizontalLayout {spacing:12px;height:44px;
+                                Rectangle {width:40px;IconBadge {kind:root.selected-function.icon;tint:C.accent;size:40px;y:(parent.height - self.height)/2;}}
+                                VerticalLayout {alignment:center;spacing:2px;horizontal-stretch:1;
+                                    Caption {text:root.assignment-target;wrap:no-wrap;overflow:elide;}
+                                    Text {text:root.selected-function.title;color:C.text;font-size:16px;font-weight:700;overflow:elide;}
+                                }
+                            }
+                            if root.key-panel < 2 && root.has-tile: EzSegmented {
+                                items: [L.t("Chức năng", "Function"), L.t("Ảnh hiển thị", "Screen image")]; current: root.key-panel == 0 ? 0 : 1; stretch: true;
+                                selected(i) => { root.key-panel = i; }
+                            }
+                            // Function
+                            if root.key-panel == 0: VerticalLayout {spacing:10px;vertical-stretch:1;
+                                if root.can-name-key: LineEdit {text<=>root.key-display-name;placeholder-text:L.t("Tên riêng, ví dụ YouTube…", "Own name, e.g. YouTube…");enabled:root.editable;
+                                    accepted=>{root.key-name-commit();}changed has-focus=>{root.key-name-editing=self.has-focus;if(!self.has-focus){root.key-name-commit();}}}
+                                LineEdit {text<=>root.search;placeholder-text:L.t("Tìm chức năng…", "Search functions…");enabled:root.editable;edited=>{root.search-function(self.text);}}
+                                EzSegmented {items:[L.t("Phổ biến", "Popular"),L.t("Phím", "Keys"),"Media",L.t("Của tôi", "Mine")];current:root.category;enabled:root.editable;stretch:true;selected(i)=>{root.select-category(i);}}
+                                if root.category == 1 && root.search == "": ComboBox {model:[L.t("Phím chức năng F1–F24", "Function keys F1–F24"),L.t("Chữ cái & số", "Letters & numbers"),L.t("Điều hướng & nhập liệu", "Navigation & editing")];current-index<=>root.key-group;enabled:root.editable;selected(t)=>{root.select-key-group(self.current-index);}}
+                                ScrollView {vertical-stretch:1;min-height:180px;
+                                    VerticalLayout {spacing:2px;padding:1px;
+                                        for f in root.functions: FunctionRow {data:f;active:f.code == root.selected-function.code;enabled:root.editable;clicked=>{root.assign(f.code);}}
+                                        if root.functions.length == 0: Caption {text:L.t("Không tìm thấy chức năng.", "No matching function.");}
+                                    }
+                                }
+                                HorizontalLayout {spacing:10px;
+                                    Text {text:L.t("Tổ hợp tùy chọn", "Custom shortcut");color:C.text;font-size:13px;vertical-alignment:center;horizontal-stretch:1;}
+                                    EzSwitch {label:L.t("Tổ hợp tùy chọn", "Custom shortcut");checked:root.advanced;enabled:root.editable;toggled(v)=>{root.advanced=v;}}
+                                }
+                                if root.advanced: LineEdit {text<=>root.chord-input;placeholder-text:"Cmd + Shift + C";enabled:root.editable;accepted=>{root.assign-text(self.text);}}
+                            }
+                            // Tile artwork
+                            if root.key-panel == 1 || root.key-panel == 3: ScrollView {vertical-stretch:1;
+                                VerticalLayout {padding:1px;spacing:14px;alignment:start;
+                                    HorizontalLayout {spacing:12px;height:64px;
+                                        TileArt {width:98px;border-radius:8px;art:root.layout-sharp-preview;tile:root.layout-tile;ready:root.art-ready;}
+                                        VerticalLayout {alignment:center;spacing:3px;
+                                            Text {text:root.layout-cell-label;color:C.text;font-size:14px;font-weight:600;}
+                                            Caption {text:L.t("Ảnh của ô này trên màn hình bàn phím", "This tile on the keyboard screen");}
+                                        }
+                                    }
+                                    ArtworkControls {
+                                        enabled: root.editable && root.layout-loaded;
+                                        kind <=> root.layout-kind; text <=> root.layout-text; text-size <=> root.layout-text-size; image-name: root.layout-image-name;
+                                        symbol-choices: root.layout-symbol-choices; symbol-name <=> root.layout-symbol-name; symbol-label: root.layout-symbol-label; symbol-weight <=> root.layout-symbol-weight; symbol-query <=> root.layout-symbol-query;
+                                        clock-face <=> root.layout-clock-face; clock-layout <=> root.layout-clock-layout; clock-hour24 <=> root.layout-clock-hour24; clock-ampm <=> root.layout-clock-ampm; clock-date <=> root.layout-clock-date;
+                                        icon-size <=> root.layout-icon-size; tint-image <=> root.layout-tint-image; use-common-ink <=> root.layout-use-common-ink; cell-ink <=> root.layout-cell-ink;
+                                        commit => { root.layout-commit(); } kind-change => { root.layout-kind-change(); } pick-image => { root.layout-pick-image(false); }
+                                        pick-symbol(n) => { root.layout-pick-symbol(n); } symbol-search(q) => { root.layout-symbol-search(q); } symbol-weight-change => { root.layout-symbol-weight-change(); }
+                                    }
+                                    Separator {}
+                                    HorizontalLayout {spacing:8px;
+                                        EzButton {text:L.t("Nền màn hình…", "Screen background…");icon:22;enabled:root.editable && root.layout-loaded;clicked=>{root.layout-select-background();}}
+                                        Spacer {}
+                                    }
+                                }
+                            }
+                            // Background
+                            if root.key-panel == 2: VerticalLayout {spacing:12px;vertical-stretch:1;
+                                HorizontalLayout {spacing:8px;
+                                    EzButton {text:L.t("Quay lại", "Back");icon:18;kind:2;clicked=>{root.key-panel=root.layout-tile == 10 ? 3 : 1;}}
+                                    Spacer {}
+                                }
+                                Text {text:L.t("Nền màn hình", "Screen background");color:C.text;font-size:16px;font-weight:700;}
+                                ScrollView {vertical-stretch:1;
+                                    VerticalLayout {padding:1px;alignment:start;
+                                        ArtworkBackground {
+                                            enabled: root.editable && root.layout-loaded;
+                                            bg-kind <=> root.layout-bg-kind; bg-color <=> root.layout-bg-color; bg-name: root.layout-bg-name;
+                                            ink-color <=> root.layout-ink-color; tile-background <=> root.layout-tile-background;
+                                            commit => { root.layout-commit(); } pick-image => { root.layout-pick-image(true); } change-kind => { root.layout-bg-change(); } preset-color(code) => { root.layout-preset-color(code); }
+                                        }
+                                    }
+                                }
+                            }
+                            if root.key-panel > 0: VerticalLayout {spacing:6px;
+                                Caption {text:root.layout-status;color:root.layout-save-failed ? C.red : C.text2;}
+                                if root.layout-save-failed: HorizontalLayout {EzButton {text:L.t("Thử gửi lại", "Retry");icon:49;kind:1;enabled:root.editable;clicked=>{root.layout-apply();}}Spacer {}}
+                            }
+                        }
+                    }
+                }
+
+                // ---------- 1 · Macro ----------
+                if root.page == 1: HorizontalLayout {
+                    spacing: 16px; vertical-stretch: 1;
+                    Card {width:200px;
+                        VerticalLayout {padding:8px;spacing:2px;
+                            GroupLabel {text:"MACRO";height:26px;vertical-alignment:center;x:8px;}
+                            ScrollView {vertical-stretch:1;
+                                VerticalLayout {spacing:2px;padding:1px;
+                                    for name[i] in root.macro-list: SelectRow {text:name;icon:21;active:root.macro-index == i;enabled:root.editable;clicked=>{root.macro-index=i;root.select-macro(i);}}
+                                }
+                            }
+                        }
+                    }
+                    Card {horizontal-stretch:1;
+                        VerticalLayout {padding:16px;spacing:12px;
+                            SectionTitle {text:root.macro-list.length > root.macro-index && root.macro-index >= 0 ? root.macro-list[root.macro-index] : "Macro";}
+                            Rectangle {background:C.win;border-radius:10px;border-width:1px;border-color:C.group-line;
+                                VerticalLayout {
+                                    FormRow {label:L.t("Tên trong Coban-mod", "Name in Coban-mod");
+                                        LineEdit {width:240px;text<=>root.macro-display-name;placeholder-text:L.t("Ví dụ: Chèn lời giải", "e.g. Insert answer");enabled:root.editable;accepted=>{root.macro-display-name-commit();}changed has-focus=>{root.macro-name-editing=self.has-focus;if(!self.has-focus){root.macro-display-name-commit();}}}
+                                    }
+                                    FormRow {label:L.t("Tên trên bàn phím", "Name on keyboard");detail:L.t("Tối đa 6 ký tự không dấu", "Up to 6 ASCII characters");last:true;
+                                        LineEdit {width:240px;text<=>root.macro-name;enabled:root.editable;accepted=>{root.macro-name-commit(self.text);}changed has-focus=>{if(!self.has-focus){root.macro-name-commit(self.text);}}}
+                                    }
+                                }
+                            }
+                            GroupLabel {text:L.t("CÁC BƯỚC", "STEPS");}
+                            ScrollView {vertical-stretch:1;min-height:160px;
+                                VerticalLayout {spacing:2px;padding:1px;
+                                    for step[i] in root.steps: SelectRow {text:(i + 1) + ". " + step.title;detail:step.detail;icon:step.icon;active:root.step-index == i;clicked=>{root.select-step(i);}}
+                                    if root.steps.length == 0: Caption {text:L.t("Macro trống. Thêm bước bên dưới.", "Empty macro. Add a step below.");}
+                                }
+                            }
+                            HorizontalLayout {spacing:8px;
+                                EzButton {text:L.t("Văn bản", "Text");icon:46;enabled:root.editable && root.macro-editable;clicked=>{root.add-step(0);}}
+                                EzButton {text:L.t("Tổ hợp", "Shortcut");icon:46;enabled:root.editable && root.macro-editable;clicked=>{root.add-step(1);}}
+                                EzButton {text:L.t("Chờ", "Delay");icon:46;enabled:root.editable && root.macro-editable;clicked=>{root.add-step(2);}}
+                                Spacer {}
+                            }
+                            Caption {text:root.macro-info;}
+                        }
+                    }
+                    Card {width:300px;
+                        VerticalLayout {padding:16px;spacing:12px;
+                            SectionTitle {text:root.step-index >= 0 ? L.t("Bước ", "Step ") + (root.step-index + 1) : L.t("Chọn một bước", "Pick a step");}
+                            ComboBox {model:[L.t("Gõ văn bản", "Type text"),L.t("Nhấn phím / tổ hợp", "Press key / shortcut"),L.t("Chờ (mili giây)", "Wait (ms)"),L.t("Giữ phím", "Hold key"),L.t("Nhả phím", "Release key")];current-index<=>root.step-kind;enabled:root.editable && root.step-index >= 0 && root.step-kind < 3;selected(t)=>{root.change-step-kind(self.current-index);}}
+                            TextEdit {text<=>root.step-text;vertical-stretch:1;min-height:90px;enabled:root.editable && root.step-index >= 0;changed has-focus=>{if(!self.has-focus){root.step-commit(self.text);}}}
+                            Caption {text:root.step-kind == 0 ? L.t("Ký tự không dấu. Tiếng Việt dùng mục Tự động hóa.", "ASCII only. Use Automation for Vietnamese text.") : root.step-kind == 2 ? L.t("Từ 0 đến 9999 mili giây.", "0 to 9999 milliseconds.") : L.t("Ví dụ: Cmd + C, Ctrl + V, Enter.", "e.g. Cmd + C, Ctrl + V, Enter.");}
+                            HorizontalLayout {EzButton {text:L.t("Xóa bước", "Delete step");icon:47;kind:3;enabled:root.editable && root.step-index >= 0;clicked=>{root.remove-step();}}Spacer {}}
+                            Separator {}
+                            GroupLabel {text:L.t("GÁN MACRO CHO PHÍM", "ASSIGN TO KEY");}
+                            for row in 2: HorizontalLayout {spacing:6px;
+                                for col in 4: EzButton {text:L.t("Phím ", "Key ") + (row * 4 + col + 1);small:true;enabled:root.editable;horizontal-stretch:1;clicked=>{root.bind-macro(row * 4 + col + 2);}}
+                            }
+                        }
+                    }
+                }
+
+                // ---------- 3 · Display: mode / source switcher ----------
+                if root.page == 3 && root.screen-is-gif: HorizontalLayout {spacing:12px;
+                    EzSegmented {toolbar:true;
+                        items: [L.t("Ảnh / GIF", "Image / GIF"), L.t("Tùy chỉnh theo phím", "Per-key layout"), L.t("Thiết lập khác", "Other settings")];
+                        current: root.screen-more-settings ? 2 : root.screen-source; enabled: !root.busy;
+                        selected(i) => { root.screen-more-settings = i == 2; if(i < 2){ root.screen-source = i; root.screen-source-change(); } }
+                    }
+                    Spacer {}
+                    Text {text:L.t("Chế độ", "Mode");color:C.text2;font-size:12px;vertical-alignment:center;}
+                    ComboBox {width:180px;model:[L.t("Đồng hồ", "Clock"),L.t("Thông tin máy", "System info"),L.t("Ảnh / GIF", "Image / GIF"),L.t("Lớp phím", "Key layer"),"Pomodoro"];current-index<=>root.screen-mode-index;enabled:root.editable;selected(t)=>{root.screen-mode-change();}}
+                }
+                // ---------- 2/3/4 · Device settings ----------
+                if root.page >= 2 && root.page <= 4 && (root.page != 3 || !root.screen-is-gif || root.screen-more-settings): VerticalLayout {
+                    spacing: 14px; vertical-stretch: 1;
+                    HorizontalLayout {spacing:16px;vertical-stretch:1;
+                        if root.settings-list.length > 1: Card {width:230px;
+                            VerticalLayout {padding:8px;spacing:2px;
+                                for name[i] in root.settings-list: SelectRow {text:name;active:root.setting-index == i;enabled:root.editable;clicked=>{root.setting-index=i;root.select-setting(i);}}
+                                Spacer {}
+                            }
+                        }
+                        VerticalLayout {spacing:0px;horizontal-stretch:1;
+                            Card {
+                                vertical-stretch: 0;
+                                VerticalLayout {padding:4px;spacing:0px;
+                                    for field[i] in root.setting-fields: SettingRow {field:field;enabled:root.editable;last:i == root.setting-fields.length - 1;edited(v)=>{root.set-field(i,v);}}
+                                    if root.setting-fields.length == 0: Caption {text:L.t("Chưa có thiết lập để hiển thị.", "Nothing to show yet.");x:14px;height:40px;vertical-alignment:center;}
+                                }
+                            }
+                            Spacer {}
+                        }
+                    }
+                    if root.page == 3 && root.stats-selected: Caption {text:L.t("Đang cấu hình bố cục. Coban-mod chưa gửi số đo CPU/RAM trực tiếp.", "Layout only. Coban-mod does not stream live CPU/RAM yet.");}
+                    HorizontalLayout {spacing:10px;
+                        if root.page == 3: EzButton {text:L.t("Đồng bộ giờ", "Sync clock");icon:32;enabled:root.editable;clicked=>{root.sync-clock();}}
+                        Spacer {}
+                        Caption {text:L.t("Lưu vào bàn phím ngay khi chỉnh xong.", "Saved to the keyboard as soon as you finish.");wrap:no-wrap;vertical-alignment:center;}
+                    }
+                }
+                // ---------- 3 · Display: upload ----------
+                if root.page == 3 && root.screen-is-gif && !root.screen-more-settings && root.screen-source == 0: Card {
+                    vertical-stretch: 1;
+                    VerticalLayout {padding:28px;spacing:16px;alignment:center;
+                        HorizontalLayout {alignment:center;IconBadge {kind:39;tint:C.teal;size:52px;}}
+                        Text {text:L.t("Ảnh của bạn trên bàn phím", "Your picture on the keyboard");color:C.text;font-size:17px;font-weight:700;horizontal-alignment:center;}
+                        Caption {text:L.t("PNG, JPEG hoặc GIF · tự chuyển về 160×80", "PNG, JPEG or GIF · converted to 160×80");horizontal-alignment:center;}
+                        HorizontalLayout {alignment:center;EzButton {text:L.t("Chọn ảnh / GIF…", "Choose image / GIF…");icon:48;kind:1;enabled:root.editable;clicked=>{root.upload-image();}}}
+                    }
+                }
+                // ---------- 3 · Display: per-key composer ----------
+                if root.composing-screen: HorizontalLayout {
+                    spacing: 16px; vertical-stretch: 1;
+                    Card {horizontal-stretch:1;min-width:360px;
+                        VerticalLayout {padding:16px;spacing:12px;
+                            HorizontalLayout {
+                                SectionTitle {text:root.layout-show-pixels ? L.t("Xem trước · pixel thật", "Preview · real pixels") : L.t("Xem trước", "Preview");}
+                                Spacer {}
+                                Text {text:L.t("Pixel 160×80", "160×80 pixels");color:C.text2;font-size:12px;vertical-alignment:center;}
+                                Rectangle {width:52px;EzSwitch {x:8px;y:(parent.height - self.height)/2;label:"160×80";checked:root.layout-show-pixels;toggled(v)=>{root.layout-show-pixels=v;}}}
+                            }
+                            Rectangle {height:176px;
+                                Rectangle {width:340px;height:172px;x:(parent.width - self.width)/2;border-radius:12px;background:#050608;
+                                    ArtworkPreview {x:10px;y:6px;width:320px;height:160px;
+                                        artwork:root.layout-show-pixels ? root.layout-preview : root.layout-sharp-preview;pixels:root.layout-show-pixels;
+                                        enabled:root.editable && root.layout-loaded;selected:root.layout-tile;
+                                        select-tile(i)=>{root.layout-select-tile(i);}
+                                    }
+                                }
+                            }
+                            Separator {}
+                            ScrollView {vertical-stretch:1;
+                                VerticalLayout {padding:1px;alignment:start;
+                                    ArtworkBackground {
+                                        enabled: root.editable && root.layout-loaded;
+                                        bg-kind <=> root.layout-bg-kind; bg-color <=> root.layout-bg-color; bg-name: root.layout-bg-name;
+                                        ink-color <=> root.layout-ink-color; tile-background <=> root.layout-tile-background;
+                                        commit => { root.layout-commit(); } pick-image => { root.layout-pick-image(true); } change-kind => { root.layout-bg-change(); } preset-color(code) => { root.layout-preset-color(code); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Card {width:320px;
+                        VerticalLayout {padding:16px;spacing:12px;
+                            SectionTitle {text:root.layout-cell-label;}
+                            ScrollView {vertical-stretch:1;min-height:160px;
+                                VerticalLayout {padding:1px;spacing:10px;alignment:start;
+                                    ArtworkControls {
+                                        enabled: root.editable && root.layout-loaded;
+                                        kind <=> root.layout-kind; text <=> root.layout-text; text-size <=> root.layout-text-size; image-name: root.layout-image-name;
+                                        symbol-choices: root.layout-symbol-choices; symbol-name <=> root.layout-symbol-name; symbol-label: root.layout-symbol-label; symbol-weight <=> root.layout-symbol-weight; symbol-query <=> root.layout-symbol-query;
+                                        clock-face <=> root.layout-clock-face; clock-layout <=> root.layout-clock-layout; clock-hour24 <=> root.layout-clock-hour24; clock-ampm <=> root.layout-clock-ampm; clock-date <=> root.layout-clock-date;
+                                        icon-size <=> root.layout-icon-size; tint-image <=> root.layout-tint-image; use-common-ink <=> root.layout-use-common-ink; cell-ink <=> root.layout-cell-ink;
+                                        commit => { root.layout-commit(); } kind-change => { root.layout-kind-change(); } pick-image => { root.layout-pick-image(false); }
+                                        pick-symbol(n) => { root.layout-pick-symbol(n); } symbol-search(q) => { root.layout-symbol-search(q); } symbol-weight-change => { root.layout-symbol-weight-change(); }
+                                    }
+                                }
+                            }
+                            Caption {text:root.layout-status;color:root.layout-save-failed ? C.red : C.text2;}
+                            HorizontalLayout {spacing:8px;
+                                if root.layout-save-failed: EzButton {text:L.t("Thử gửi lại", "Retry");icon:49;kind:1;enabled:root.editable && root.layout-loaded;clicked=>{root.layout-apply();}}
+                                EzButton {text:L.t("Tải lại bố cục", "Reload layout");icon:49;enabled:!root.busy;clicked=>{root.layout-reload();}}
+                                Spacer {}
+                            }
+                        }
+                    }
+                }
+
+                // ---------- 5 · Automation ----------
+                if root.page == 5: VerticalLayout {
+                    spacing: 14px; vertical-stretch: 1;
+                    HorizontalLayout {spacing:10px;
+                        ComboBox {width:260px;model:root.host-profiles;current-index<=>root.host-profile-index;enabled:!root.busy;selected(t)=>{root.host-select(self.current-index);}}
+                        EzButton {text:L.t("Bộ hành động mới", "New action set");icon:46;enabled:!root.busy;clicked=>{root.host-new();}}
+                        Spacer {}
+                        StatusChip {text:root.service-label;tint:root.service-tint;}
+                    }
+                    HorizontalLayout {spacing:16px;vertical-stretch:1;
+                        Card {horizontal-stretch:1;
+                            VerticalLayout {padding:16px;spacing:12px;
+                                SectionTitle {text:L.t("Hành động của tôi", "My actions");}
+                                Rectangle {background:C.win;border-radius:10px;border-width:1px;border-color:C.group-line;
+                                    VerticalLayout {
+                                        FormRow {label:L.t("Tên bộ hành động", "Action set name");
+                                            LineEdit {width:260px;text<=>root.host-name;enabled:!root.busy;accepted=>{root.host-commit();}changed has-focus=>{if(!self.has-focus){root.host-commit();}}}
+                                        }
+                                        FormRow {label:L.t("Phím kích hoạt", "Trigger key");
+                                            ComboBox {width:260px;model:root.host-triggers;current-index<=>root.host-trigger;enabled:!root.busy;selected(t)=>{root.host-select(root.host-profile-index);}}
+                                        }
+                                        FormRow {label:L.t("Tên riêng của phím", "Key name");
+                                            LineEdit {width:260px;text<=>root.host-trigger-name;placeholder-text:L.t("Hiển thị trong Coban-mod", "Shown in Coban-mod");enabled:!root.busy;accepted=>{root.host-trigger-name-commit();}changed has-focus=>{root.host-trigger-name-editing=self.has-focus;if(!self.has-focus){root.host-trigger-name-commit();}}}
+                                        }
+                                        FormRow {label:L.t("Hành động", "Action");last:true;
+                                            ComboBox {width:260px;model:[L.t("Gõ văn bản tiếng Việt", "Type Vietnamese text"),L.t("Mở website", "Open website"),L.t("Mở ứng dụng", "Open app"),L.t("Mở tệp", "Open file"),L.t("Chuỗi phím & khoảng chờ", "Key sequence & delays")];current-index<=>root.host-kind;enabled:!root.busy;selected(t)=>{root.host-change-kind();}}
+                                        }
+                                    }
+                                }
+                                if root.host-kind == 0 || root.host-kind == 4: TextEdit {text<=>root.host-text;enabled:!root.busy;vertical-stretch:1;min-height:100px;changed has-focus=>{if(!self.has-focus){root.host-commit();}}}
+                                if root.host-kind >= 1 && root.host-kind <= 3: LineEdit {text<=>root.host-text;placeholder-text:root.host-kind == 1 ? L.t("youtube.com hoặc https://…", "youtube.com or https://…") : root.host-kind == 2 ? L.t("Tên hoặc đường dẫn ứng dụng", "App name or path") : L.t("Đường dẫn tệp cần mở", "File to open");enabled:!root.busy;accepted=>{root.host-commit();}changed has-focus=>{if(!self.has-focus){root.host-commit();}}}
+                                if root.host-kind == 1: Caption {text:L.t("Chỉ cần nhập youtube.com; Coban-mod tự thêm https://.", "Just type youtube.com; Coban-mod adds https:// for you.");}
+                                if root.host-kind == 2: Caption {text:root.is-macos ? L.t("Chọn tệp .app hoặc nhập tên, ví dụ Safari.", "Pick an .app or type a name such as Safari.") : L.t("Chọn tệp .exe hoặc lối tắt .lnk.", "Pick an .exe or .lnk shortcut.");}
+                                HorizontalLayout {spacing:8px;
+                                    if root.host-kind == 2 || root.host-kind == 3: EzButton {text:root.host-kind == 2 ? L.t("Chọn ứng dụng…", "Choose app…") : L.t("Chọn tệp…", "Choose file…");icon:41;enabled:!root.busy;clicked=>{root.host-pick-target();}}
+                                    if root.host-kind >= 1 && root.host-kind <= 3: EzButton {text:L.t("Thử ngay", "Try it");icon:13;kind:1;enabled:!root.busy && root.host-text != "";clicked=>{root.host-test();}}
+                                    Spacer {}
+                                    EzButton {text:L.t("Xóa hành động", "Delete action");icon:47;kind:3;enabled:!root.busy && root.host-profile-index >= 0;clicked=>{root.host-remove();}}
+                                }
+                                if root.host-kind >= 1 && root.host-kind <= 3: Spacer {}
+                                Caption {text:L.t("Tự lưu khi rời ô. Gán tại trang Coban-mod → Của tôi.", "Saves when you leave a field. Assign it on the Coban-mod page → Mine.");}
+                            }
+                        }
+                        Card {width:300px;
+                            VerticalLayout {padding:16px;spacing:12px;
+                                SectionTitle {text:L.t("Ứng dụng đang dùng", "Active app");}
+                                Caption {text:L.t("Để trống để dùng ở mọi ứng dụng.", "Leave empty to use everywhere.");}
+                                LineEdit {text<=>root.host-app;placeholder-text:L.t("Mọi ứng dụng", "Any app");enabled:!root.busy;accepted=>{root.host-commit();}changed has-focus=>{if(!self.has-focus){root.host-commit();}}}
+                                HorizontalLayout {EzButton {text:L.t("Chọn ứng dụng…", "Choose app…");icon:24;enabled:!root.busy;clicked=>{root.host-pick-app();}}Spacer {}}
+                                Separator {}
+                                SectionTitle {text:L.t("Dịch vụ nhận phím", "Key service");}
+                                Text {text:root.host-status;color:C.text2;font-size:12px;wrap:word-wrap;}
+                                if root.is-macos: HorizontalLayout {EzButton {text:L.t("Cấp quyền nhận phím…", "Grant input access…");icon:42;enabled:!root.busy;clicked=>{root.host-open-permissions();}}Spacer {}}
+                                Spacer {}
+                            }
+                        }
+                    }
+                }
+
+                // ---------- 6 · Backup & restore ----------
+                if root.page == 6: VerticalLayout {
+                    spacing: 14px; vertical-stretch: 1;
+                    HorizontalLayout {spacing:10px;
+                        EzButton {text:L.t("Sao lưu…", "Back up…");icon:6;kind:1;enabled:root.editable;clicked=>{root.backup();}}
+                        EzButton {text:L.t("Khôi phục…", "Restore…");icon:4;enabled:root.editable;clicked=>{root.restore();}}
+                        EzButton {text:L.t("Mở thư mục sao lưu", "Open backup folder");icon:41;kind:2;clicked=>{root.open-backups();}}
+                        Spacer {}
+                    }
+                    Card {vertical-stretch:1;
+                        VerticalLayout {padding:16px;spacing:12px;
+                            SectionTitle {text:L.t("Lịch sử thay đổi", "Change history");}
+                            ScrollView {vertical-stretch:1;
+                                VerticalLayout {spacing:0px;padding:1px;
+                                    for entry[i] in root.history: Rectangle {min-height:34px;
+                                        HorizontalLayout {padding-top:7px;padding-bottom:7px;spacing:10px;
+                                            IconSlot {kind:26;ink:C.green;size:14px;}
+                                            Text {text:entry;color:C.text;font-size:13px;wrap:word-wrap;horizontal-stretch:1;vertical-alignment:center;}
+                                        }
+                                        if i < root.history.length - 1: Rectangle {x:24px;y:parent.height - 1px;height:1px;width:parent.width - 24px;background:C.sep;}
+                                    }
+                                    if root.history.length == 0: Caption {text:L.t("Chưa có thay đổi trong phiên này.", "No changes in this session yet.");}
+                                }
+                            }
+                        }
+                    }
+                    Card {
+                        VerticalLayout {padding:14px;spacing:6px;
+                            Caption {text:root.backup-info;}
+                            Caption {text:root.device-detail;}
+                            if root.warnings != "": Text {text:root.warnings;color:C.warning-text;font-size:11px;wrap:word-wrap;}
+                        }
+                    }
+                }
+
+                // ---------- 7 · Settings ----------
+                if root.page == 7: ScrollView {
+                    vertical-stretch: 1;
+                    HorizontalLayout {alignment:center;
+                        VerticalLayout {
+                            width: min(640px, root.width - 260px); spacing: 8px; alignment: start; padding-bottom: 20px;
+                            GroupLabel {text:L.t("KHỞI ĐỘNG & DỊCH VỤ", "STARTUP & SERVICE");x:12px;}
+                            Card {
+                                VerticalLayout {
+                                    FormRow {
+                                        icon: 40; tint: C.gray;
+                                        label: root.is-macos ? L.t("Khởi động cùng macOS", "Open at macOS login") : L.t("Khởi động cùng Windows", "Open at Windows sign-in");
+                                        detail: root.host-login-status;
+                                        Rectangle {width:44px;EzSwitch {y:(parent.height - self.height)/2;label:"login";checked:root.host-login-enabled;enabled:root.host-login-available && !root.busy;
+                                            toggled(v)=>{root.host-login-enabled=v;root.host-login-toggle(v);}}}
+                                    }
+                                    FormRow {
+                                        icon: 42; tint: C.orange; label: L.t("Dịch vụ nhận phím", "Key service");
+                                        detail: L.t("Tự chạy cùng Coban-mod, tự dừng khi thoát ứng dụng.", "Runs with Coban-mod and stops when you quit.");
+                                        StatusChip {text:root.service-label;tint:root.service-tint;}
+                                    }
+                                    if root.is-macos: FormRow {
+                                        icon: 43; tint: C.accent; label: L.t("Quyền nhận phím của macOS", "macOS input access"); last: true;
+                                        EzButton {text:L.t("Mở thiết lập…", "Open settings…");enabled:!root.busy;clicked=>{root.host-open-permissions();}}
+                                    }
+                                }
+                            }
+                            Rectangle {height:10px;}
+                            GroupLabel {text:L.t("GIAO DIỆN", "APPEARANCE");x:12px;}
+                            Card {
+                                VerticalLayout {
+                                    FormRow {icon:45;tint:C.gray;label:L.t("Giao diện", "Appearance");
+                                        EzSegmented {items:[L.t("Sáng", "Light"),L.t("Tối", "Dark"),L.t("Tự động", "Auto")];current:root.theme-mode == 1 ? 0 : root.theme-mode == 2 ? 1 : 2;
+                                            selected(i)=>{root.theme-mode = i == 0 ? 1 : i == 1 ? 2 : 0;}}
+                                    }
+                                    FormRow {icon:44;tint:C.accent;label:L.t("Ngôn ngữ", "Language");last:true;
+                                        EzSegmented {items:["Tiếng Việt","English"];current:root.en ? 1 : 0;selected(i)=>{root.en = i == 1;}}
+                                    }
+                                }
+                            }
+                            Rectangle {height:10px;}
+                            GroupLabel {text:L.t("ỨNG DỤNG", "APPLICATION");x:12px;}
+                            Card {
+                                VerticalLayout {
+                                    FormRow {icon:38;tint:C.purple;label:"Coban-mod";detail:L.t("Phiên bản ", "Version ") + root.app-version + " · Bao-keyboard";}
+                                    if root.is-macos: FormRow {icon:22;tint:C.teal;label:L.t("Chạy trên menubar", "Menu bar");detail:L.t("Đóng cửa sổ vẫn giữ Coban-mod trên menubar.", "Closing the window keeps Coban-mod in the menu bar.");}
+                                    FormRow {icon:40;tint:C.red;label:L.t("Thoát Coban-mod", "Quit Coban-mod");detail:L.t("Dừng cả dịch vụ nhận phím.", "Also stops the key service.");last:true;
+                                        EzButton {text:L.t("Thoát", "Quit");kind:3;enabled:!root.busy;clicked=>{root.stop-agent();}}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // ---------- Status bar ----------
+            Rectangle {
+                height: 30px; background: C.ground;
+                Rectangle {height:1px;background:C.sep;y:0px;}
+                HorizontalLayout {padding-left:16px;padding-right:16px;spacing:8px;
+                    IconSlot {kind:root.status-error ? 33 : (root.busy ? 32 : 26);ink:root.status-error ? C.red : (root.busy ? C.accent : C.green);size:13px;}
+                    Text {text:root.status;color:root.status-error ? C.red : C.text2;font-size:11px;vertical-alignment:center;horizontal-stretch:1;overflow:elide;}
+                    Text {text:root.connected ? L.t("Tự động lưu trên bàn phím", "Auto-saved on the keyboard") : L.t("Chưa kết nối bàn phím", "Keyboard not connected");color:C.text3;font-size:11px;vertical-alignment:center;}
+                }
+            }
+        }
+    }
+}

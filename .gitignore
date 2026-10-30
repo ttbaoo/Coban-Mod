@@ -1,0 +1,23 @@
+/target/
+/dist/
+/dist-*/
+/backups/
+/.tools/
+/.work/
+*.log
+.DS_Store
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local recovery images and package staging
+*.uf2
+*.bin
+*.mk.json
+.mk-package-*/
